@@ -1,0 +1,6 @@
+{
+  "example.com": {
+    "passwordless": "allowed",
+    "documentation": "https://example.com/passkeys"
+  }
+}

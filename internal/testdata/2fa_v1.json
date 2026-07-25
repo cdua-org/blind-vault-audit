@@ -1,0 +1,12 @@
+[
+  [
+    "example",
+    {
+      "domain": "example.com",
+      "tfa": [
+        "totp"
+      ],
+      "documentation": "https://example.com/2fa"
+    }
+  ]
+]

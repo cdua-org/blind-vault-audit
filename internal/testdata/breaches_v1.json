@@ -1,0 +1,24 @@
+[
+  {
+    "Name": "ExampleBreach",
+    "Title": "Example Breach",
+    "Domain": "example.net",
+    "BreachDate": "2026-01-01",
+    "AddedDate": "2026-01-02T00:00:00Z",
+    "ModifiedDate": "2026-01-02T00:00:00Z",
+    "PwnCount": 1000,
+    "Description": "Test breach for example.com",
+    "DataClasses": [
+      "Email addresses",
+      "Passwords"
+    ],
+    "IsVerified": true,
+    "IsFabricated": false,
+    "IsSensitive": false,
+    "IsRetired": false,
+    "IsSpamList": false,
+    "IsMalware": false,
+    "IsSubscriptionFree": false,
+    "IsStealerLog": false
+  }
+]

@@ -1,0 +1,230 @@
+{
+    "items": [
+        {
+            "archived": 0,
+            "auto_submit": 1,
+            "category": "login",
+            "category_name": "Login",
+            "createdAt": 1509991623,
+            "favorite": 0,
+            "field_updated_at": 1724023558,
+            "fields": [
+                {
+                    "deleted": 0,
+                    "history": [
+                        {
+                            "encrypted": false,
+                            "updated_at": 1724023391,
+                            "value": "user-old@mail.example.com"
+                        }
+                    ],
+                    "label": "Username",
+                    "order": 1,
+                    "sensitive": 0,
+                    "type": "username",
+                    "uid": 8229,
+                    "updated_at": 1724023391,
+                    "value": "user@uptime.example.com",
+                    "value_updated_at": 1724023391
+                },
+                {
+                    "deleted": 0,
+                    "history": [
+                        {
+                            "encrypted": false,
+                            "updated_at": 1724023443,
+                            "value": "history_p"
+                        }
+                    ],
+                    "label": "Password",
+                    "order": 2,
+                    "sensitive": 1,
+                    "type": "password",
+                    "uid": 8232,
+                    "updated_at": 1724023443,
+                    "value": "new_p",
+                    "value_updated_at": 1724023443
+                },
+                {
+                    "deleted": 0,
+                    "history": [
+                        {
+                            "encrypted": false,
+                            "updated_at": 1593334183,
+                            "value": "2FA"
+                        }
+                    ],
+                    "label": "2FA",
+                    "order": 3,
+                    "sensitive": 1,
+                    "type": "totp",
+                    "uid": 9233,
+                    "updated_at": 1593446232,
+                    "value": "2fa_v",
+                    "value_updated_at": 1593334209
+                },
+                {
+                    "deleted": 0,
+                    "history": [
+                        {
+                            "encrypted": false,
+                            "updated_at": 1724023558,
+                            "value": "https://uptime.example.com/signUp"
+                        }
+                    ],
+                    "label": "Url",
+                    "order": 4,
+                    "sensitive": 0,
+                    "type": "url",
+                    "uid": 8235,
+                    "updated_at": 1724023558,
+                    "value": "https://dashboard.uptime.example.com/login",
+                    "value_updated_at": 1724023558
+                },
+                {
+                    "deleted": 0,
+                    "label": "Web",
+                    "order": 5,
+                    "sensitive": 0,
+                    "type": "url",
+                    "uid": 6691,
+                    "updated_at": 1724023391,
+                    "value": "https://old.uptime.example.com/login",
+                    "value_updated_at": 1713981007
+                },
+                {
+                    "deleted": 0,
+                    "label": "secret",
+                    "order": 6,
+                    "sensitive": 1,
+                    "type": "text",
+                    "uid": 9590,
+                    "updated_at": 1724023558,
+                    "value": "secr_v",
+                    "value_updated_at": 1724023558
+                }
+            ],
+            "icon": {
+                "fav": "dashboard.uptime.example.com",
+                "image": {
+                    "file": "misc/login"
+                },
+                "type": 1,
+                "uuid": ""
+            },
+            "note": "",
+            "subtitle": "user@uptime.example.com",
+            "template_type": "import.imported",
+            "title": "Uptime",
+            "trashed": 0,
+            "updated_at": 1784716780,
+            "uuid": "uuid-num"
+        },
+        {
+            "archived": 0,
+            "auto_submit": 1,
+            "category": "login",
+            "category_name": "Login",
+            "createdAt": 1509991620,
+            "favorite": 0,
+            "field_updated_at": 1563183318,
+            "fields": [
+                {
+                    "deleted": 0,
+                    "label": "Username",
+                    "order": 1,
+                    "sensitive": 0,
+                    "type": "username",
+                    "uid": 5561,
+                    "updated_at": 1509989513,
+                    "value": "old-username",
+                    "value_updated_at": 1509989513
+                },
+                {
+                    "deleted": 0,
+                    "history": [
+                        {
+                            "encrypted": false,
+                            "updated_at": 1563181850,
+                            "value": "old-pas"
+                        }
+                    ],
+                    "label": "Password",
+                    "order": 2,
+                    "sensitive": 1,
+                    "type": "password",
+                    "uid": 5564,
+                    "updated_at": 1664008777,
+                    "value": "new-pas",
+                    "value_updated_at": 1563183318
+                },
+                {
+                    "deleted": 0,
+                    "label": "Url",
+                    "order": 3,
+                    "sensitive": 0,
+                    "type": "url",
+                    "uid": 5567,
+                    "updated_at": 1509989513,
+                    "value": "http://old-site.example.net/",
+                    "value_updated_at": 1509989513
+                },
+                {
+                    "deleted": 0,
+                    "label": "Url",
+                    "order": 4,
+                    "sensitive": 0,
+                    "type": "url",
+                    "uid": 5033,
+                    "updated_at": 1547886510,
+                    "value": "http://club.example.net/forum/login.php",
+                    "value_updated_at": 1547886510
+                },
+                {
+                    "deleted": 0,
+                    "history": [
+                        {
+                            "encrypted": false,
+                            "updated_at": 1563183170,
+                            "value": "Site"
+                        }
+                    ],
+                    "label": "Site",
+                    "order": 5,
+                    "sensitive": 0,
+                    "type": "url",
+                    "uid": 5995,
+                    "updated_at": 1563183214,
+                    "value": "https://new-club.example.net/forum/login.php?redirect=redir.php",
+                    "value_updated_at": 1563183214
+                },
+                {
+                    "deleted": 0,
+                    "label": "current pass    field",
+                    "order": 6,
+                    "sensitive": 1,
+                    "type": "password",
+                    "uid": 4644,
+                    "updated_at": 1563183318,
+                    "value": "old-pas",
+                    "value_updated_at": 1563183318
+                }
+            ],
+            "icon": {
+                "fav": "club.example.net",
+                "image": {
+                    "file": "misc/login"
+                },
+                "type": 1,
+                "uuid": ""
+            },
+            "note": "",
+            "subtitle": "new-user",
+            "template_type": "import.imported",
+            "title": "club",
+            "trashed": 0,
+            "updated_at": 1676153720,
+            "uuid": "uuid_num2"
+        }
+        ]
+}
