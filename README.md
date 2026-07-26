@@ -40,7 +40,7 @@ Below is an example of how to manually download, extract, and install the macOS 
 # 1. Set the variables for your target system
 REPO="cdua-org/blind-vault-audit"
 VERSION=$(curl -sSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | head -n 1 | awk -F'"' '{print $4}')
-ASSET_NAME="bva-darwin-arm64.tar.gz"
+ASSET_NAME="blind-vault-audit-macos-apple-silicon.tar.gz"
 INSTALL_DIR="/usr/local/bin"
 
 # 2. Download the archive
