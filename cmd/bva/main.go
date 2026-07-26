@@ -85,7 +85,7 @@ func run(args []string) error {
 	customUsage := fs.Usage
 	fs.Usage = func() {}
 
-	if checkHelpFlagPresent(args) {
+	if len(args) == 0 || checkHelpFlagPresent(args) {
 		customUsage()
 		return flag.ErrHelp
 	}

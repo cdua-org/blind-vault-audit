@@ -57,8 +57,8 @@ func TestMain_MissingMode(t *testing.T) {
 	if !exited {
 		t.Error("expected main to call osExit on missing mode")
 	}
-	if !strings.Contains(output, "is required") {
-		t.Errorf("expected output to mention required mode, got %q", output)
+	if !strings.Contains(output, "Global Options:") {
+		t.Errorf("expected output to mention Global Options, got %q", output)
 	}
 }
 
@@ -283,6 +283,7 @@ func TestRun_ParseError(t *testing.T) {
 		{"HelpFlagShort", "Global Options:", []string{flagHelpShort}},
 		{"HelpFlagLong", "Modes:", []string{flagHelp}},
 		{"HelpAfterFlagFile", "Cache Directory:", []string{flagFileShort, flagHelpShort}},
+		{"MissingModeWithFile", "--mode is required (breach or mfa)", []string{flagFile, "vault.json"}},
 	}
 
 	for _, tt := range tests {
