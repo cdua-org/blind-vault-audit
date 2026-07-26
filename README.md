@@ -14,10 +14,10 @@ For example, without a premium subscription, some password managers will check y
 
 The tool is designed with strict data privacy constraints:
 
-- **k-Anonymity Password Auditing**: Passwords are never transmitted. The tool computes a SHA-1 hash of each password locally and transmits the prefix (only the first 5 characters of the hash) to the [Have I Been Pwned (HIBP)](https://haveibeenpwned.com) API. The API returns all hash suffixes matching the prefix, and the full comparison is performed locally in memory.
-- **Offline 2FA & Passkey Evaluation**: To determine 2FA and Passkey support, `bva` makes network requests solely to fetch and cache the full datasets from [2fa.directory](https://2fa.directory) and [passkeys.2fa.directory](https://passkeys.2fa.directory). Once cached, the vault is parsed and evaluated entirely offline. Vault domain structures are never transmitted.
+- **k-Anonymity Password Auditing**: Passwords are never transmitted. The tool computes a SHA-1 hash of each password locally and transmits the prefix (only the first 5 characters of the hash) to the Have I Been Pwned (HIBP) API. The API returns all hash suffixes matching the prefix, and the full comparison is performed locally in memory.
+- **Offline 2FA & Passkey Evaluation**: To determine 2FA and Passkey support, `bva` makes network requests solely to fetch and cache the full datasets from 2fa.directory and passkeys.2fa.directory. Once cached, the vault is parsed and evaluated entirely offline. Vault domain structures are never transmitted.
 - **No Built-in Telemetry**: The `bva` tool itself collects zero telemetry and tracks no usage data.
-- **Restricted Outbound Connections**: Outbound network requests are strictly limited to fetching public security datasets from third-party APIs (HIBP, 2fa.directory, passkeys.2fa.directory).
+- **Restricted Outbound Connections**: Outbound network requests are strictly limited to fetching public security datasets from third-party APIs ([HIBP](https://haveibeenpwned.com), [2fa.directory](https://2fa.directory), [passkeys.2fa.directory](https://passkeys.2fa.directory)).
 
 Currently supported vault formats:
 - [Enpass](https://www.enpass.io) (JSON export)
