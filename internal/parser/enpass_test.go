@@ -125,22 +125,45 @@ func TestEnpassProvider_extractDomain(t *testing.T) {
 func TestEnpassProvider_parseItem(t *testing.T) {
 	provider := NewEnpassProvider()
 
-	types := []string{config.FieldTypePassword, config.FieldTypeUsername, config.FieldTypeURL}
-	fields := []fieldJSON{
-		{Type: types[0], Value: "pass1", ValueUpdatedAt: int(1600000000)},
-		{Type: types[1], Value: ""},
-		{Type: types[2], Value: "http://invalid%url"},
+	tests := []struct {
+		name              string
+		fields            []fieldJSON
+		expectedPasswords int
+		expectedUpdatedAt int64
+	}{
+		{
+			name: "deleted field",
+			fields: []fieldJSON{
+				{Type: config.FieldTypePassword, Value: "secret", Deleted: 1},
+			},
+			expectedPasswords: 0,
+		},
+		{
+			name: "valid fields",
+			fields: []fieldJSON{
+				{Type: config.FieldTypePassword, Value: "pass1", ValueUpdatedAt: int(1600000000), Order: 2},
+				{Type: config.FieldTypePassword, Value: "pass2", ValueUpdatedAt: int(1700000000), Order: 1},
+				{Type: config.FieldTypeUsername, Value: ""},
+				{Type: config.FieldTypeURL, Value: "http://invalid%url"},
+			},
+			expectedPasswords: 2,
+			expectedUpdatedAt: 1700000000,
+		},
 	}
 
-	item := provider.parseItem("", fields)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			item := provider.parseItem("", tt.fields)
 
-	if item.Title != "Untitled" {
-		t.Errorf("expected 'Untitled', got %q", item.Title)
-	}
-	if len(item.Passwords) != 1 || item.Passwords[0].Value != "pass1" {
-		t.Errorf("expected 1 password 'pass1', got %v", item.Passwords)
-	}
-	if item.Passwords[0].UpdatedAt != 1600000000 {
-		t.Errorf("expected timestamp 1600000000, got %d", item.Passwords[0].UpdatedAt)
+			if item.Title != "Untitled" {
+				t.Errorf("expected default Title, got %q", item.Title)
+			}
+			if len(item.Passwords) != tt.expectedPasswords {
+				t.Errorf("expected %d passwords, got %d", tt.expectedPasswords, len(item.Passwords))
+			}
+			if tt.expectedPasswords > 0 && item.Passwords[0].UpdatedAt != tt.expectedUpdatedAt {
+				t.Errorf("expected timestamp %d, got %d", tt.expectedUpdatedAt, item.Passwords[0].UpdatedAt)
+			}
+		})
 	}
 }

@@ -36,8 +36,8 @@ func (e *Engine) runBreach(ctx context.Context, items []parser.VaultItem) error 
 	var processed atomic.Int32
 	stopSpinner := spinner.Start(ctx, "Auditing vault items...", &processed, len(items))
 
-	var compromisedTitles []string
-	var allReports []string
+	allReports := make([]string, 0, len(items))
+	var compromisedEntries []compromisedEntry
 	var mu sync.Mutex
 
 	itemCh := make(chan parser.VaultItem, len(items))
@@ -61,14 +61,17 @@ func (e *Engine) runBreach(ctx context.Context, items []parser.VaultItem) error 
 		go func() {
 			defer wg.Done()
 			for item := range itemCh {
-				isComp, report := e.processItem(ctx, item, breaches)
+				isComp, compNames, report := e.processItem(ctx, item, breaches)
 
 				mu.Lock()
 				if report != "" {
 					allReports = append(allReports, report)
 				}
 				if isComp {
-					compromisedTitles = append(compromisedTitles, item.Title)
+					compromisedEntries = append(compromisedEntries, compromisedEntry{
+						Title: item.Title,
+						Names: compNames,
+					})
 				}
 				mu.Unlock()
 
@@ -80,14 +83,21 @@ func (e *Engine) runBreach(ctx context.Context, items []parser.VaultItem) error 
 	wg.Wait()
 	stopSpinner()
 
-	sort.Strings(compromisedTitles)
+	sort.Slice(compromisedEntries, func(i, j int) bool {
+		return compromisedEntries[i].Title < compromisedEntries[j].Title
+	})
 
-	e.printAndSaveBreachReport(allReports, compromisedTitles, breachesPath, breachesMod)
+	e.printAndSaveBreachReport(allReports, compromisedEntries, breachesPath, breachesMod)
 
 	return nil
 }
 
-func (e *Engine) printAndSaveBreachReport(allReports, compromisedTitles []string, breachesPath string, breachesMod time.Time) {
+type compromisedEntry struct {
+	Title string
+	Names []string
+}
+
+func (e *Engine) printAndSaveBreachReport(allReports []string, compromisedEntries []compromisedEntry, breachesPath string, breachesMod time.Time) {
 	var finalReport strings.Builder
 
 	if len(allReports) > 0 {
@@ -99,16 +109,16 @@ func (e *Engine) printAndSaveBreachReport(allReports, compromisedTitles []string
 		}
 	}
 
-	summary := fmt.Sprintf("Audit complete. Total compromised/vulnerable items found: %d\n", len(compromisedTitles))
+	summary := fmt.Sprintf("Audit complete. Total compromised/vulnerable items found: %d\n", len(compromisedEntries))
 	fmt.Print(summary)
 	finalReport.WriteString(summary)
 
-	if len(compromisedTitles) > 0 {
+	if len(compromisedEntries) > 0 {
 		hdr := "\nCompromised entries:\n"
 		fmt.Print(hdr)
 		finalReport.WriteString(hdr)
-		for _, title := range compromisedTitles {
-			tStr := fmt.Sprintf(" - %s\n", title)
+		for _, entry := range compromisedEntries {
+			tStr := fmt.Sprintf(" - %s [%s]\n", entry.Title, strings.Join(entry.Names, ", "))
 			fmt.Print(tStr)
 			finalReport.WriteString(tStr)
 		}
@@ -117,10 +127,13 @@ func (e *Engine) printAndSaveBreachReport(allReports, compromisedTitles []string
 	}
 
 	if !e.config.CheckAll && breachesPath != "" {
-		cacheInfo := fmt.Sprintf("\nCache Information:\n  - Breaches: %s (updated: %s)\n",
+		cacheInfo := fmt.Sprintf("\nCache Information:\n  - Breaches: %s (updated: %s)\n\n",
 			breachesPath, breachesMod.Format("2006-01-02 15:04:05"))
 		fmt.Print(cacheInfo)
 		finalReport.WriteString(cacheInfo)
+	} else {
+		fmt.Println()
+		finalReport.WriteString("\n")
 	}
 
 	if e.config.OutputDir != "" {
@@ -203,7 +216,7 @@ func (e *Engine) parseBreachData(breachesData []byte) (map[string]BreachInfo, er
 	return breaches, nil
 }
 
-func (e *Engine) processItem(ctx context.Context, item parser.VaultItem, breaches map[string]BreachInfo) (isCompromised bool, report string) {
+func (e *Engine) processItem(ctx context.Context, item parser.VaultItem, breaches map[string]BreachInfo) (isCompromised bool, compNames []string, report string) {
 	var breachTs int64
 	var breachedDomains []string
 	var leakedData []string
@@ -214,13 +227,15 @@ func (e *Engine) processItem(ctx context.Context, item parser.VaultItem, breache
 	}
 
 	if !isCompromised {
-		return false, ""
+		return false, nil, ""
 	}
 
 	var sb strings.Builder
 	if !e.config.CheckAll {
 		for i, domain := range breachedDomains {
 			fmt.Fprintf(&sb, "[!] Vulnerable domain %s found in entry: %s\n", domain, item.Title)
+			breachDateStr := time.Unix(breachTs, 0).UTC().Format("2006-01-02")
+			fmt.Fprintf(&sb, "    Breach Date: %s\n", breachDateStr)
 			if leakedData[i] != "" {
 				fmt.Fprintf(&sb, "    Leaked: %s\n", leakedData[i])
 			}
@@ -231,48 +246,59 @@ func (e *Engine) processItem(ctx context.Context, item parser.VaultItem, breache
 
 	if len(item.Passwords) == 0 {
 		sb.WriteString("    [i] No password found for this entry (possible false positive or biometrics used).\n\n")
-		return false, sb.String()
+		return false, nil, sb.String()
 	}
 
-	isSafe, pwReport := e.checkPasswordsConcurrently(ctx, item, breachTs)
+	isSafe, compromisedNames, pwReport := e.checkPasswordsConcurrently(ctx, item, breachTs)
 	sb.WriteString(pwReport)
 
-	return !isSafe, sb.String()
+	return !isSafe, compromisedNames, sb.String()
 }
 
-func (e *Engine) checkPasswordsConcurrently(ctx context.Context, item parser.VaultItem, breachTs int64) (isSafe bool, report string) {
-	isSafe = true
-	var compromisedMessages []string
-	var wg sync.WaitGroup
-	msgCh := make(chan string, len(item.Passwords))
-	safeCh := make(chan bool, len(item.Passwords))
+type pwCheckResult struct {
+	Message string
+	NameStr string
+	Index   int
+	IsSafe  bool
+}
 
-	for _, pw := range item.Passwords {
+func (e *Engine) checkPasswordsConcurrently(ctx context.Context, item parser.VaultItem, breachTs int64) (isSafe bool, compromisedNames []string, report string) {
+	var wg sync.WaitGroup
+	resCh := make(chan pwCheckResult, len(item.Passwords))
+	totalPws := len(item.Passwords)
+
+	for i, pw := range item.Passwords {
 		wg.Add(1)
-		go e.checkSinglePassword(ctx, pw, breachTs, &wg, safeCh, msgCh)
+		go e.checkSinglePassword(ctx, pw, i+1, totalPws, breachTs, &wg, resCh)
 	}
 
 	go func() {
 		wg.Wait()
-		close(msgCh)
-		close(safeCh)
+		close(resCh)
 	}()
 
-	for safe := range safeCh {
-		if !safe {
+	var results []pwCheckResult
+	for res := range resCh {
+		results = append(results, res)
+	}
+
+	sort.SliceStable(results, func(i, j int) bool {
+		return results[i].Index < results[j].Index
+	})
+
+	isSafe = true
+	for _, res := range results {
+		if !res.IsSafe {
 			isSafe = false
+			compromisedNames = append(compromisedNames, res.NameStr)
 		}
 	}
 
-	for msg := range msgCh {
-		compromisedMessages = append(compromisedMessages, msg)
-	}
-
-	report = e.formatResult(item, isSafe, breachTs, compromisedMessages)
-	return isSafe, report
+	report = e.formatResult(results, isSafe)
+	return isSafe, compromisedNames, report
 }
 
-func (e *Engine) checkSinglePassword(ctx context.Context, password parser.PasswordEntry, breachTs int64, wg *sync.WaitGroup, safeCh chan<- bool, msgCh chan<- string) {
+func (e *Engine) checkSinglePassword(ctx context.Context, password parser.PasswordEntry, pwIndex, totalPws int, breachTs int64, wg *sync.WaitGroup, resCh chan<- pwCheckResult) {
 	defer wg.Done()
 
 	pwnCount, err := e.hibpClient.CheckPasswordPwned(ctx, password.Value)
@@ -285,47 +311,68 @@ func (e *Engine) checkSinglePassword(ctx context.Context, password parser.Passwo
 		pwDateStr = time.Unix(password.UpdatedAt, 0).UTC().Format("2006-01-02")
 	}
 
+	label := password.Label
+	if label == "" {
+		label = "Password"
+	}
+
+	nameStr := fmt.Sprintf("Password '%s'", label)
+	if totalPws > 1 {
+		nameStr = fmt.Sprintf("Password #%d '%s'", pwIndex, label)
+	}
+
 	switch {
 	case pwnCount > 0:
-		safeCh <- false
-		msgCh <- fmt.Sprintf("        [X] Password (updated %s) found in HIBP leaks (Pwned %d times)!", pwDateStr, pwnCount)
+		resCh <- pwCheckResult{
+			Index:   pwIndex,
+			IsSafe:  false,
+			NameStr: nameStr,
+			Message: fmt.Sprintf("        [X] %s (updated %s) found in HIBP (Pwned %d times)!", nameStr, pwDateStr, pwnCount),
+		}
 	case !e.config.CheckAll && password.UpdatedAt <= breachTs:
-		safeCh <- false
-		msgCh <- fmt.Sprintf("        [!] Password (updated %s) is older than the breach (but NOT found in global leaks)!", pwDateStr)
+		resCh <- pwCheckResult{
+			Index:   pwIndex,
+			IsSafe:  false,
+			NameStr: nameStr,
+			Message: fmt.Sprintf("        [!] %s (updated %s) is older than the breach (but NOT found in HIBP)!", nameStr, pwDateStr),
+		}
 	default:
-		safeCh <- true
+		if !e.config.CheckAll {
+			resCh <- pwCheckResult{
+				Index:   pwIndex,
+				IsSafe:  true,
+				NameStr: nameStr,
+				Message: fmt.Sprintf("    [+] %s (updated %s) updated AFTER the breach and NOT found in HIBP (safe).", nameStr, pwDateStr),
+			}
+		} else {
+			resCh <- pwCheckResult{
+				Index:   pwIndex,
+				IsSafe:  true,
+				NameStr: nameStr,
+				Message: fmt.Sprintf("    [+] %s (updated %s) is NOT found in HIBP (safe).", nameStr, pwDateStr),
+			}
+		}
 	}
 }
 
-func (e *Engine) formatResult(item parser.VaultItem, isSafe bool, breachTs int64, compromisedMessages []string) string {
+func (e *Engine) formatResult(results []pwCheckResult, isSafe bool) string {
 	var sb strings.Builder
-	breachDateStr := time.Unix(breachTs, 0).UTC().Format("2006-01-02")
 
-	if isSafe {
-		if !e.config.CheckAll {
-			maxPwTs := int64(0)
-			for _, p := range item.Passwords {
-				if p.UpdatedAt > maxPwTs {
-					maxPwTs = p.UpdatedAt
-				}
-			}
-			pwDateStr := time.Unix(maxPwTs, 0).UTC().Format("2006-01-02")
-			sb.WriteString("    [+] Password updated AFTER the breach and NOT found in global leaks (safe).\n")
-			fmt.Fprintf(&sb, "        Breach Date:   %s\n", breachDateStr)
-			fmt.Fprintf(&sb, "        Password Date: %s\n\n", pwDateStr)
-		} else {
-			sb.WriteString("    [+] Password is NOT found in global leaks (safe).\n\n")
+	for _, res := range results {
+		if res.IsSafe {
+			sb.WriteString(res.Message + "\n")
 		}
-		return sb.String()
 	}
 
-	sb.WriteString("    \033[31;1m[!] IMMEDIATE ACTION REQUIRED.\033[0m\n")
-	if !e.config.CheckAll {
-		fmt.Fprintf(&sb, "        Breach Date:   %s\n", breachDateStr)
+	if !isSafe {
+		sb.WriteString("    \033[31;1m[!] IMMEDIATE ACTION REQUIRED.\033[0m\n")
+		for _, res := range results {
+			if !res.IsSafe {
+				sb.WriteString(res.Message + "\n")
+			}
+		}
 	}
-	for _, msg := range compromisedMessages {
-		sb.WriteString(msg + "\n")
-	}
+
 	sb.WriteString("\n")
 	return sb.String()
 }

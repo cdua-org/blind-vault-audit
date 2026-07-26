@@ -78,6 +78,14 @@ func TestRunBreach(t *testing.T) {
 					Title:   "Pwned Item",
 					Domains: []string{"pwned.net"},
 					Passwords: []parser.PasswordEntry{
+						{Value: "pwned_pass", UpdatedAt: 0, Order: 2, Label: "Pass1"},
+						{Value: "safe_pass", UpdatedAt: time.Now().Unix(), Order: 1, Label: "Pass2"},
+					},
+				},
+				{
+					Title:   "Another Pwned Item",
+					Domains: []string{"pwned.net"},
+					Passwords: []parser.PasswordEntry{
 						{Value: "pwned_pass", UpdatedAt: 0},
 					},
 				},

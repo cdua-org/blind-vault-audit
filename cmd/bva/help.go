@@ -10,7 +10,9 @@ import (
 )
 
 const (
-	bannerPad = "   "
+	bannerPad   = "   "
+	usageMFA    = "  bva " + flagMode + " " + config.ModeMFA + " " + flagFile + " <VAULT PATH> [" + flagForce + "] [" + flagOutput + " <REPORT DIR PATH>]"
+	usageBreach = "  bva " + flagMode + " " + config.ModeBreach + " " + flagFile + " <VAULT PATH> [" + flagPasswordsOnly + "] [" + flagForce + "] [" + flagOutput + " <REPORT DIR PATH>] [" + flagWorkers + " <NUM>]"
 )
 
 func defaultUserCacheDir() (string, error) {
@@ -65,10 +67,22 @@ func printBanner(version string) {
 	fmt.Fprintf(os.Stderr, "%s%s:: Offline 2FA & Passkey evaluation ::%s\n\n", bannerPad, dim, reset)
 }
 
+func printUsageExamples(mode string) {
+	fmt.Fprintf(os.Stderr, "Usage:\n")
+	switch mode {
+	case config.ModeMFA:
+		fmt.Fprintf(os.Stderr, "%s\n", usageMFA)
+	case config.ModeBreach:
+		fmt.Fprintf(os.Stderr, "%s\n", usageBreach)
+	default:
+		fmt.Fprintf(os.Stderr, "%s\n", usageMFA)
+		fmt.Fprintf(os.Stderr, "%s\n", usageBreach)
+	}
+	fmt.Fprintf(os.Stderr, "\n")
+}
+
 func setupHelp(mode *string, fs *flag.FlagSet) {
 	fs.Usage = func() {
-		printBanner(Version)
-
 		cacheDir, err := osUserCacheDir()
 		if err == nil && cacheDir != "" {
 			cacheDir = filepath.Join(cacheDir, "bva")
@@ -78,14 +92,14 @@ func setupHelp(mode *string, fs *flag.FlagSet) {
 
 		if mode == nil || *mode == "" {
 			fmt.Fprintf(os.Stderr, "Usage:\n")
-			fmt.Fprintf(os.Stderr, "  bva %s <%s|%s> [options]\n\n", flagMode, config.ModeBreach, config.ModeMFA)
+			fmt.Fprintf(os.Stderr, "  bva %s <%s|%s> [options]\n", flagMode, config.ModeBreach, config.ModeMFA)
+			fmt.Fprintf(os.Stderr, "  bva %s\n\n", flagVersion)
 			fmt.Fprintf(os.Stderr, "Modes:\n")
 			fmt.Fprintf(os.Stderr, "  %s   Check passwords against Have I Been Pwned database\n", config.ModeBreach)
 			fmt.Fprintf(os.Stderr, "  %s      Check security posture (2FA and Passkey support)\n\n", config.ModeMFA)
-			fmt.Fprintf(os.Stderr, "Run 'bva %s <mode> %s' for mode-specific options.\n\n", flagMode, flagHelp)
+			fmt.Fprintf(os.Stderr, "Tip: Run 'bva %s <mode> %s' for mode-specific options.\n\n", flagMode, flagHelp)
 			fmt.Fprintf(os.Stderr, "Global Options:\n")
-			fmt.Fprintf(os.Stderr, "      %-18s  Print version and exit\n", flagVersion)
-			fmt.Fprintf(os.Stderr, "  %s, %-14s  Print this help message and exit\n\n", flagHelpShort, flagHelp)
+			fmt.Fprintf(os.Stderr, "  %s, %-18s  Print this help message and exit\n\n", flagHelpShort, flagHelp)
 			fmt.Fprintf(os.Stderr, "Cache Directory: %s\n\n", cacheDir)
 			return
 		}
@@ -94,23 +108,23 @@ func setupHelp(mode *string, fs *flag.FlagSet) {
 		case config.ModeBreach:
 			fmt.Fprintf(os.Stderr, "Mode: %s - Check passwords against HIBP database\n\n", config.ModeBreach)
 			fmt.Fprintf(os.Stderr, "Usage:\n")
-			fmt.Fprintf(os.Stderr, "  bva %s %s %s <VAULT PATH> [%s] [%s] [%s <REPORT DIR PATH>] [%s <NUM>]\n", flagMode, config.ModeBreach, flagFile, flagAll, flagForce, flagOutput, flagWorkers)
-			fmt.Fprintf(os.Stderr, "  bva %s %s %s <VAULT PATH> [%s] [%s] [%s <REPORT DIR PATH>] [%s <NUM>]\n\n", flagMode, config.ModeBreach, flagFileShort, flagAllShort, flagForce, flagOutputShort, flagWorkersShort)
+			fmt.Fprintf(os.Stderr, "%s\n", usageBreach)
+			fmt.Fprintf(os.Stderr, "  bva %s %s %s\n\n", flagMode, config.ModeBreach, flagHelp)
 			fmt.Fprintf(os.Stderr, "Options:\n")
-			fmt.Fprintf(os.Stderr, "  %s, %-14s  Path to the Enpass JSON vault file (default \"enpass.json\")\n", flagFileShort, flagFile)
-			fmt.Fprintf(os.Stderr, "  %s, %-14s  Path to save the audit reports directory\n", flagOutputShort, flagOutput)
-			fmt.Fprintf(os.Stderr, "  %s, %-14s  Check all passwords, ignoring domain breach dates.\n", flagAllShort, flagAll)
+			fmt.Fprintf(os.Stderr, "  %s, %-18s  Path to the JSON vault file\n", flagFileShort, flagFile)
+			fmt.Fprintf(os.Stderr, "  %s, %-18s  Path to save the audit reports directory\n", flagOutputShort, flagOutput)
+			fmt.Fprintf(os.Stderr, "      %-18s  Check all passwords, ignoring domain breach dates.\n", flagPasswordsOnly)
 			fmt.Fprintf(os.Stderr, "      %-18s  Force update of local breach cache database, ignoring TTL\n", flagForce)
-			fmt.Fprintf(os.Stderr, "  %s, %-14s  Number of concurrent workers for HIBP checks (default: 5).\n", flagWorkersShort, flagWorkers)
+			fmt.Fprintf(os.Stderr, "  %s, %-18s  Number of concurrent workers for HIBP checks (default: 5).\n", flagWorkersShort, flagWorkers)
 			fmt.Fprintf(os.Stderr, "                          Higher numbers check faster but use more resources.\n")
 		case config.ModeMFA:
 			fmt.Fprintf(os.Stderr, "Mode: %s - Check security posture (2FA and Passkey support)\n\n", config.ModeMFA)
 			fmt.Fprintf(os.Stderr, "Usage:\n")
-			fmt.Fprintf(os.Stderr, "  bva %s %s %s <VAULT PATH> [%s] [%s <REPORT DIR PATH>]\n", flagMode, config.ModeMFA, flagFile, flagForce, flagOutput)
-			fmt.Fprintf(os.Stderr, "  bva %s %s %s <VAULT PATH> [%s] [%s <REPORT DIR PATH>]\n\n", flagMode, config.ModeMFA, flagFileShort, flagForce, flagOutputShort)
+			fmt.Fprintf(os.Stderr, "%s\n", usageMFA)
+			fmt.Fprintf(os.Stderr, "  bva %s %s %s\n\n", flagMode, config.ModeMFA, flagHelp)
 			fmt.Fprintf(os.Stderr, "Options:\n")
-			fmt.Fprintf(os.Stderr, "  %s, %-14s  Path to the Enpass JSON vault file (default \"enpass.json\")\n", flagFileShort, flagFile)
-			fmt.Fprintf(os.Stderr, "  %s, %-14s  Path to save the audit reports directory\n", flagOutputShort, flagOutput)
+			fmt.Fprintf(os.Stderr, "  %s, %-18s  Path to the JSON vault file\n", flagFileShort, flagFile)
+			fmt.Fprintf(os.Stderr, "  %s, %-18s  Path to save the audit reports directory\n", flagOutputShort, flagOutput)
 			fmt.Fprintf(os.Stderr, "      %-18s  Force update of local MFA cache databases, ignoring TTL\n", flagForce)
 		default:
 			fmt.Fprintf(os.Stderr, "Unknown mode: %s\n\n", *mode)
@@ -118,8 +132,7 @@ func setupHelp(mode *string, fs *flag.FlagSet) {
 			return
 		}
 
-		fmt.Fprintf(os.Stderr, "      %-18s  Print version and exit\n", flagVersion)
-		fmt.Fprintf(os.Stderr, "  %s, %-14s  Print this help message and exit\n\n", flagHelpShort, flagHelp)
+		fmt.Fprintf(os.Stderr, "  %s, %-18s  Print this help message and exit\n\n", flagHelpShort, flagHelp)
 		fmt.Fprintf(os.Stderr, "Cache Directory: %s\n\n", cacheDir)
 	}
 }

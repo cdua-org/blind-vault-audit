@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/cdua-org/blind-vault-audit/internal/config"
@@ -54,9 +55,22 @@ type fieldJSON struct {
 	ValueUpdatedAt any    `json:"value_updated_at"`
 	Type           string `json:"type"`
 	Value          string `json:"value"`
+	Label          string `json:"label"`
 	History        []struct {
 		Value string `json:"value"`
 	} `json:"history"`
+	Deleted int `json:"deleted"`
+	Order   int `json:"order"`
+}
+
+func filterActiveFields(fields []fieldJSON) []fieldJSON {
+	var activeFields []fieldJSON
+	for _, field := range fields {
+		if field.Deleted == 0 {
+			activeFields = append(activeFields, field)
+		}
+	}
+	return activeFields
 }
 
 func (p *EnpassProvider) parseItem(title string, fields []fieldJSON) VaultItem {
@@ -68,10 +82,12 @@ func (p *EnpassProvider) parseItem(title string, fields []fieldJSON) VaultItem {
 		vaultItem.Title = "Untitled"
 	}
 
+	activeFields := filterActiveFields(fields)
+
 	domainSet := make(map[string]struct{})
 
 	historySet := make(map[string]struct{})
-	for _, field := range fields {
+	for _, field := range activeFields {
 		if field.Type == config.FieldTypePassword {
 			for _, h := range field.History {
 				if h.Value != "" {
@@ -81,7 +97,7 @@ func (p *EnpassProvider) parseItem(title string, fields []fieldJSON) VaultItem {
 		}
 	}
 
-	for _, field := range fields {
+	for _, field := range activeFields {
 		val := field.Value
 		if val == "" {
 			continue
@@ -101,6 +117,8 @@ func (p *EnpassProvider) parseItem(title string, fields []fieldJSON) VaultItem {
 			vaultItem.Passwords = append(vaultItem.Passwords, PasswordEntry{
 				Value:     val,
 				UpdatedAt: updatedAt,
+				Label:     field.Label,
+				Order:     field.Order,
 			})
 		case config.FieldTypeTOTP:
 			vaultItem.HasTOTP = true
@@ -110,6 +128,10 @@ func (p *EnpassProvider) parseItem(title string, fields []fieldJSON) VaultItem {
 	for d := range domainSet {
 		vaultItem.Domains = append(vaultItem.Domains, d)
 	}
+
+	sort.SliceStable(vaultItem.Passwords, func(i, j int) bool {
+		return vaultItem.Passwords[i].Order < vaultItem.Passwords[j].Order
+	})
 
 	return vaultItem
 }

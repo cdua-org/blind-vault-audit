@@ -61,7 +61,7 @@ func TestSetupHelp(t *testing.T) {
 		{
 			name:     "EmptyMode",
 			modeVal:  "",
-			wantText: "Usage:",
+			wantText: "Modes:",
 		},
 	}
 

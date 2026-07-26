@@ -81,7 +81,7 @@ func (e *Engine) runMFA(ctx context.Context, items []parser.VaultItem) error {
 	finalReport.WriteString(summary)
 
 	if path2FA != "" && passkeysPath != "" {
-		cacheInfo := fmt.Sprintf("\nCache Information:\n  - 2FA:      %s (updated: %s)\n  - Passkeys: %s (updated: %s)\n",
+		cacheInfo := fmt.Sprintf("\nCache Information:\n  - 2FA:      %s (updated: %s)\n  - Passkeys: %s (updated: %s)\n\n",
 			path2FA, mod2FA.Format("2006-01-02 15:04:05"),
 			passkeysPath, passkeysMod.Format("2006-01-02 15:04:05"))
 		fmt.Print(cacheInfo)

@@ -8,7 +8,9 @@ import (
 // PasswordEntry represents a single password and its last update timestamp.
 type PasswordEntry struct {
 	Value     string
+	Label     string
 	UpdatedAt int64
+	Order     int
 }
 
 // VaultItem represents an entry in a password manager vault.
