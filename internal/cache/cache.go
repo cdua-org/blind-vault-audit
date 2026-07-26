@@ -13,6 +13,27 @@ import (
 	"github.com/cdua-org/blind-vault-audit/internal/config"
 )
 
+func defaultOSStat(name string) (os.FileInfo, error) {
+	info, err := os.Stat(name)
+	if err != nil {
+		return nil, fmt.Errorf("stat failed: %w", err)
+	}
+	return info, nil
+}
+
+func defaultOSOpenFile(name string, flag int, perm os.FileMode) (io.WriteCloser, error) {
+	f, err := os.OpenFile(filepath.Clean(name), flag, perm)
+	if err != nil {
+		return nil, fmt.Errorf("open file: %w", err)
+	}
+	return f, nil
+}
+
+var (
+	osStat     = defaultOSStat
+	osOpenFile = defaultOSOpenFile
+)
+
 const (
 	file2FA      = "2fa_v1.json"
 	filePK       = "passkeys_v1.json"
@@ -69,7 +90,7 @@ func NewManager(client *http.Client, opts ...Option) (*Manager, error) {
 // IsCached checks if the given file exists and is within TTL.
 func (m *Manager) IsCached(filename string) bool {
 	path := filepath.Join(m.dir, filename)
-	info, err := os.Stat(path)
+	info, err := osStat(path)
 	if err == nil {
 		if time.Since(info.ModTime()) < m.ttl {
 			return true
@@ -102,7 +123,7 @@ func (m *Manager) fetch(ctx context.Context, url, filename string, force bool) (
 	path = filepath.Join(m.dir, safeFilename)
 
 	if !force {
-		info, errStat := os.Stat(path)
+		info, errStat := osStat(path)
 		if errStat == nil && time.Since(info.ModTime()) < m.ttl {
 			var readErr error
 			data, readErr = os.ReadFile(filepath.Clean(path))
@@ -141,7 +162,7 @@ func (m *Manager) downloadAndCache(ctx context.Context, url, path string) (data 
 		return nil, path, time.Time{}, false, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	f, fileErr := os.OpenFile(filepath.Clean(path), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	f, fileErr := osOpenFile(filepath.Clean(path), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if fileErr != nil {
 		return nil, path, time.Time{}, false, fmt.Errorf("failed to open cache file %s: %w", path, fileErr)
 	}
@@ -151,7 +172,7 @@ func (m *Manager) downloadAndCache(ctx context.Context, url, path string) (data 
 		return nil, path, time.Time{}, false, fmt.Errorf("failed to write cache file %s", path)
 	}
 
-	info, statErr := os.Stat(path)
+	info, statErr := osStat(path)
 	if statErr == nil {
 		modTime = info.ModTime()
 	} else {

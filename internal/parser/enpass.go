@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cdua-org/blind-vault-audit/internal/config"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -71,7 +72,7 @@ func (p *EnpassProvider) parseItem(title string, fields []fieldJSON) VaultItem {
 
 	historySet := make(map[string]struct{})
 	for _, field := range fields {
-		if field.Type == "password" {
+		if field.Type == config.FieldTypePassword {
 			for _, h := range field.History {
 				if h.Value != "" {
 					historySet[h.Value] = struct{}{}
@@ -87,12 +88,12 @@ func (p *EnpassProvider) parseItem(title string, fields []fieldJSON) VaultItem {
 		}
 
 		switch field.Type {
-		case "url":
+		case config.FieldTypeURL:
 			domain := p.extractDomain(strings.TrimSpace(val))
 			if domain != "" {
 				domainSet[domain] = struct{}{}
 			}
-		case "password":
+		case config.FieldTypePassword:
 			if _, isOld := historySet[val]; isOld {
 				continue
 			}
@@ -101,7 +102,7 @@ func (p *EnpassProvider) parseItem(title string, fields []fieldJSON) VaultItem {
 				Value:     val,
 				UpdatedAt: updatedAt,
 			})
-		case "totp":
+		case config.FieldTypeTOTP:
 			vaultItem.HasTOTP = true
 		}
 	}

@@ -34,47 +34,103 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func TestEngine_Run(t *testing.T) {
-	origTransport := http.DefaultTransport
-	http.DefaultTransport = &mockTransport{
-		roundTrip: func(req *http.Request) (*http.Response, error) {
-			if req.URL.String() == config.EndpointBreaches {
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(bytes.NewReader(testdata.FixtureBreaches)),
-				}, nil
-			}
-			return nil, errors.New("unexpected URL")
-		},
-	}
-	defer func() { http.DefaultTransport = origTransport }()
-
-	client := hibp.NewClient(nil, "")
-
 	tempDir := t.TempDir()
 
-	mockItems := []parser.VaultItem{
+	tests := []struct {
+		mockErr   error
+		roundTrip func(req *http.Request) (*http.Response, error)
+		name      string
+		mode      string
+		mockItems []parser.VaultItem
+		wantErr   bool
+	}{
 		{
-			Title:   "Safe Entry",
-			Domains: []string{"unique3.example.com"},
-			Passwords: []parser.PasswordEntry{
-				{Value: "safe", UpdatedAt: time.Now().Unix()},
+			name: "success breach mode",
+			mode: config.ModeBreach,
+			mockItems: []parser.VaultItem{
+				{
+					Title:   "Safe Entry",
+					Domains: []string{"unique3.example.com"},
+					Passwords: []parser.PasswordEntry{
+						{Value: "safe", UpdatedAt: time.Now().Unix()},
+					},
+				},
+			},
+			mockErr: nil,
+			wantErr: false,
+			roundTrip: func(req *http.Request) (*http.Response, error) {
+				if req.URL.String() == config.EndpointBreaches {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(bytes.NewReader(testdata.FixtureBreaches)),
+					}, nil
+				}
+				return nil, errors.New("unexpected URL")
+			},
+		},
+		{
+			name:      "parse error",
+			mode:      config.ModeBreach,
+			mockItems: nil,
+			mockErr:   errors.New("parser error"),
+			wantErr:   true,
+			roundTrip: func(_ *http.Request) (*http.Response, error) {
+				return nil, errors.New("not used")
+			},
+		},
+		{
+			name: "success mfa mode",
+			mode: config.ModeMFA,
+			mockItems: []parser.VaultItem{
+				{
+					Title:   "MFA Entry",
+					Domains: []string{"unique3.example.com"},
+				},
+			},
+			mockErr: nil,
+			wantErr: false,
+			roundTrip: func(req *http.Request) (*http.Response, error) {
+				url := req.URL.String()
+				if url == config.Endpoint2FA {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(bytes.NewReader(testdata.Fixture2FA)),
+					}, nil
+				}
+				if url == config.EndpointPK {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(bytes.NewReader(testdata.FixturePasskeys)),
+					}, nil
+				}
+				return nil, errors.New("unexpected URL")
 			},
 		},
 	}
-	mockProvider := &MockProvider{items: mockItems, err: nil}
 
-	cfg := Config{
-		Mode:         "breach",
-		CheckAll:     false,
-		Workers:      1,
-		OutputDir:    t.TempDir(),
-		CacheOptions: []cache.Option{cache.WithCacheDirFunc(func() (string, error) { return tempDir, nil })},
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			origTransport := http.DefaultTransport
+			http.DefaultTransport = &mockTransport{roundTrip: tt.roundTrip}
+			defer func() { http.DefaultTransport = origTransport }()
 
-	eng := New(client, mockProvider, cfg)
+			client := hibp.NewClient(nil, "")
+			mockProvider := &MockProvider{items: tt.mockItems, err: tt.mockErr}
 
-	err := eng.Run(context.Background(), "dummy.json")
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
+			cfg := Config{
+				Mode:         tt.mode,
+				CheckAll:     false,
+				Workers:      1,
+				OutputDir:    t.TempDir(),
+				CacheOptions: []cache.Option{cache.WithCacheDirFunc(func() (string, error) { return tempDir, nil })},
+			}
+
+			eng := New(client, mockProvider, &cfg)
+
+			err := eng.Run(context.Background(), "dummy.json")
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Expected wantErr=%v, got: %v", tt.wantErr, err)
+			}
+		})
 	}
 }

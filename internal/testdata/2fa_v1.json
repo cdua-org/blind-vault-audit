@@ -6,7 +6,8 @@
       "tfa": [
         "totp"
       ],
-      "documentation": "https://example.com/2fa"
+      "documentation": "https://example.com/2fa",
+      "notes": "Available for premium users only"
     }
   ]
 ]

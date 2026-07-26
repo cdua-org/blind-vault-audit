@@ -9,15 +9,22 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/cdua-org/blind-vault-audit/internal/cache"
+	"github.com/cdua-org/blind-vault-audit/internal/config"
 	"github.com/cdua-org/blind-vault-audit/internal/engine"
 	"github.com/cdua-org/blind-vault-audit/internal/hibp"
 	"github.com/cdua-org/blind-vault-audit/internal/parser"
 )
 
 var (
-	Version = "dev"
-	osExit  = os.Exit
+	Version       = "dev"
+	osExit        = os.Exit
+	newHTTPClient = defaultHTTPClient
 )
+
+func defaultHTTPClient() *http.Client {
+	return &http.Client{}
+}
 
 const (
 	flagMode         = "--mode"
@@ -34,9 +41,6 @@ const (
 	flagVersionShort = "-v"
 	flagHelp         = "--help"
 	flagHelpShort    = "-h"
-
-	modeBreach = "breach"
-	modeMFA    = "mfa"
 )
 
 func main() {
@@ -102,22 +106,26 @@ func run(args []string) error {
 	}
 
 	ctx := context.Background()
-	httpClient := &http.Client{}
+	httpClient := newHTTPClient()
 	userAgent := "Blind-Breach-Audit/" + Version
 	hibpClient := hibp.NewClient(httpClient, userAgent)
 	enpassProvider := parser.NewEnpassProvider()
 
 	cfg := engine.Config{
-		Mode:      *mode,
-		CheckAll:  finalCheckAll,
-		Workers:   workers,
-		OutputDir: finalOutputDir,
-		Force:     *force,
+		Mode:       *mode,
+		CheckAll:   finalCheckAll,
+		Workers:    workers,
+		OutputDir:  finalOutputDir,
+		Force:      *force,
+		HTTPClient: httpClient,
+		CacheOptions: []cache.Option{
+			cache.WithCacheDirFunc(osUserCacheDir),
+		},
 	}
 
 	printBanner(Version)
 
-	eng := engine.New(hibpClient, enpassProvider, cfg)
+	eng := engine.New(hibpClient, enpassProvider, &cfg)
 	if err := eng.Run(ctx, finalVaultFile); err != nil {
 		return fmt.Errorf("engine run failed: %w", err)
 	}
@@ -126,21 +134,21 @@ func run(args []string) error {
 
 func parseMode(mode *string, args []string) error {
 	if *mode == "" && len(args) > 0 {
-		if args[0] == modeBreach || args[0] == modeMFA {
+		if args[0] == config.ModeBreach || args[0] == config.ModeMFA {
 			*mode = args[0]
 		}
 	}
 	if *mode == "" {
-		return fmt.Errorf("%s is required (%s or %s)", flagMode, modeBreach, modeMFA)
+		return fmt.Errorf("%s is required (%s or %s)", flagMode, config.ModeBreach, config.ModeMFA)
 	}
 	return nil
 }
 
 func validateFlags(mode string, finalCheckAll bool) error {
-	if mode == modeMFA && finalCheckAll {
-		return fmt.Errorf("%s or %s flag is only valid for mode: %s", flagAll, flagAllShort, modeBreach)
+	if mode == config.ModeMFA && finalCheckAll {
+		return fmt.Errorf("%s or %s flag is only valid for mode: %s", flagAll, flagAllShort, config.ModeBreach)
 	}
-	if mode != modeBreach && mode != modeMFA {
+	if mode != config.ModeBreach && mode != config.ModeMFA {
 		return fmt.Errorf("invalid mode '%s'", mode)
 	}
 	return nil

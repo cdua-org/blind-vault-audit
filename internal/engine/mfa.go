@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,11 +15,12 @@ import (
 
 	"github.com/cdua-org/blind-vault-audit/internal/cache"
 	"github.com/cdua-org/blind-vault-audit/internal/cli/spinner"
+	"github.com/cdua-org/blind-vault-audit/internal/config"
 	"github.com/cdua-org/blind-vault-audit/internal/parser"
 )
 
 func (e *Engine) runMFA(ctx context.Context, items []parser.VaultItem) error {
-	cacheMgr, err := cache.NewManager(&http.Client{}, e.config.CacheOptions...)
+	cacheMgr, err := cache.NewManager(e.config.HTTPClient, e.config.CacheOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to init cache manager: %w", err)
 	}
@@ -132,15 +132,15 @@ func (e *Engine) parse2FAData(data []byte) (map[string]SecurityInfo, error) {
 		if !ok {
 			continue
 		}
-		tfa, ok := obj["tfa"].([]any)
+		methods2FA, ok := obj["tfa"].([]any)
 		if !ok {
 			continue
 		}
 
 		hasTOTP := false
-		for _, t := range tfa {
-			ts, ok := t.(string)
-			if ok && (ts == "totp" || ts == "custom-software") {
+		for _, method := range methods2FA {
+			methodStr, ok := method.(string)
+			if ok && methodStr == config.FieldTypeTOTP {
 				hasTOTP = true
 				break
 			}

@@ -7,3 +7,17 @@ const (
 	EndpointPK       = "https://passkeys-api.2fa.directory/v1/all.json"
 	EndpointBreaches = "https://haveibeenpwned.com/api/v3/breaches"
 )
+
+// Modes supported by the application.
+const (
+	ModeBreach = "breach"
+	ModeMFA    = "mfa"
+)
+
+// Field types.
+const (
+	FieldTypePassword = "password"
+	FieldTypeUsername = "username"
+	FieldTypeURL      = "url"
+	FieldTypeTOTP     = "totp"
+)

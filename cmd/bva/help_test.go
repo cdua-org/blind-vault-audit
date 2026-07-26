@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/cdua-org/blind-vault-audit/internal/config"
 )
 
 func captureStderr(t *testing.T, f func()) string {
@@ -43,12 +45,12 @@ func TestSetupHelp(t *testing.T) {
 	}{
 		{
 			name:     "ModeBreach",
-			modeVal:  modeBreach,
+			modeVal:  config.ModeBreach,
 			wantText: "Mode: breach - Check passwords against HIBP database",
 		},
 		{
 			name:     "ModeMFA",
-			modeVal:  "mfa",
+			modeVal:  config.ModeMFA,
 			wantText: "Mode: mfa - Check security posture (2FA and Passkey support)",
 		},
 		{
@@ -76,5 +78,44 @@ func TestSetupHelp(t *testing.T) {
 				t.Errorf("expected output to contain %q, got %q", tt.wantText, output)
 			}
 		})
+	}
+}
+
+func TestSetupHelp_CacheDirError(t *testing.T) {
+	originalCacheDirFunc := osUserCacheDir
+	defer func() { osUserCacheDir = originalCacheDirFunc }()
+
+	osUserCacheDir = func() (string, error) {
+		return "", os.ErrNotExist
+	}
+
+	mode := config.ModeBreach
+	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	setupHelp(&mode, fs)
+	output := captureStderr(t, func() {
+		fs.Usage()
+	})
+
+	wantText := "unknown (could not determine user cache dir)"
+	if !strings.Contains(output, wantText) {
+		t.Errorf("expected output to contain %q, got %q", wantText, output)
+	}
+}
+
+func TestDefaultUserCacheDir_Error(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("XDG_CACHE_HOME", "")
+	t.Setenv("LocalAppData", "")
+	t.Setenv("home", "")
+
+	dir, err := defaultUserCacheDir()
+	if err == nil {
+		t.Fatalf("expected error, got nil (dir: %s)", dir)
+	}
+	if dir != "" {
+		t.Errorf("expected empty dir on error, got %s", dir)
+	}
+	if !strings.Contains(err.Error(), "failed to get user cache dir") {
+		t.Errorf("expected wrapped error message, got: %v", err)
 	}
 }

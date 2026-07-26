@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -19,7 +18,7 @@ import (
 )
 
 func (e *Engine) runBreach(ctx context.Context, items []parser.VaultItem) error {
-	cacheMgr, err := cache.NewManager(&http.Client{}, e.config.CacheOptions...)
+	cacheMgr, err := cache.NewManager(e.config.HTTPClient, e.config.CacheOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to init cache manager: %w", err)
 	}
@@ -338,6 +337,10 @@ func (e *Engine) checkBreachedDomains(item parser.VaultItem, breaches map[string
 			continue
 		}
 
+		if len(bInfo.DataClasses) == 0 {
+			continue
+		}
+
 		hasPasswords := false
 		for _, class := range bInfo.DataClasses {
 			if class == DataClassPasswords || class == "Passwords (plaintext)" {
@@ -354,11 +357,7 @@ func (e *Engine) checkBreachedDomains(item parser.VaultItem, breaches map[string
 			breachTs = bInfo.BreachDate
 		}
 		breachedDomains = append(breachedDomains, domain)
-		if len(bInfo.DataClasses) > 0 {
-			leakedData = append(leakedData, strings.Join(bInfo.DataClasses, ", "))
-		} else {
-			leakedData = append(leakedData, "")
-		}
+		leakedData = append(leakedData, strings.Join(bInfo.DataClasses, ", "))
 	}
 	return
 }

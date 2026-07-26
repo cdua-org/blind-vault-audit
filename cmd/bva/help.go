@@ -5,11 +5,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/cdua-org/blind-vault-audit/internal/config"
 )
 
 const (
 	bannerPad = "   "
 )
+
+func defaultUserCacheDir() (string, error) {
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user cache dir: %w", err)
+	}
+	return dir, nil
+}
+
+var osUserCacheDir = defaultUserCacheDir
 
 func printBanner(version string) {
 	gold := "\033[38;2;204;135;4m"
@@ -57,7 +69,7 @@ func setupHelp(mode *string, fs *flag.FlagSet) {
 	fs.Usage = func() {
 		printBanner(Version)
 
-		cacheDir, err := os.UserCacheDir()
+		cacheDir, err := osUserCacheDir()
 		if err == nil && cacheDir != "" {
 			cacheDir = filepath.Join(cacheDir, "bva")
 		} else {
@@ -66,10 +78,10 @@ func setupHelp(mode *string, fs *flag.FlagSet) {
 
 		if mode == nil || *mode == "" {
 			fmt.Fprintf(os.Stderr, "Usage:\n")
-			fmt.Fprintf(os.Stderr, "  bva %s <%s|%s> [options]\n\n", flagMode, modeBreach, modeMFA)
+			fmt.Fprintf(os.Stderr, "  bva %s <%s|%s> [options]\n\n", flagMode, config.ModeBreach, config.ModeMFA)
 			fmt.Fprintf(os.Stderr, "Modes:\n")
-			fmt.Fprintf(os.Stderr, "  %s   Check passwords against Have I Been Pwned database\n", modeBreach)
-			fmt.Fprintf(os.Stderr, "  %s      Check security posture (2FA and Passkey support)\n\n", modeMFA)
+			fmt.Fprintf(os.Stderr, "  %s   Check passwords against Have I Been Pwned database\n", config.ModeBreach)
+			fmt.Fprintf(os.Stderr, "  %s      Check security posture (2FA and Passkey support)\n\n", config.ModeMFA)
 			fmt.Fprintf(os.Stderr, "Run 'bva %s <mode> %s' for mode-specific options.\n\n", flagMode, flagHelp)
 			fmt.Fprintf(os.Stderr, "Global Options:\n")
 			fmt.Fprintf(os.Stderr, "      %-18s  Print version and exit\n", flagVersion)
@@ -79,11 +91,11 @@ func setupHelp(mode *string, fs *flag.FlagSet) {
 		}
 
 		switch *mode {
-		case modeBreach:
-			fmt.Fprintf(os.Stderr, "Mode: %s - Check passwords against HIBP database\n\n", modeBreach)
+		case config.ModeBreach:
+			fmt.Fprintf(os.Stderr, "Mode: %s - Check passwords against HIBP database\n\n", config.ModeBreach)
 			fmt.Fprintf(os.Stderr, "Usage:\n")
-			fmt.Fprintf(os.Stderr, "  bva %s %s %s <VAULT PATH> [%s] [%s] [%s <REPORT DIR PATH>] [%s <NUM>]\n", flagMode, modeBreach, flagFile, flagAll, flagForce, flagOutput, flagWorkers)
-			fmt.Fprintf(os.Stderr, "  bva %s %s %s <VAULT PATH> [%s] [%s] [%s <REPORT DIR PATH>] [%s <NUM>]\n\n", flagMode, modeBreach, flagFileShort, flagAllShort, flagForce, flagOutputShort, flagWorkersShort)
+			fmt.Fprintf(os.Stderr, "  bva %s %s %s <VAULT PATH> [%s] [%s] [%s <REPORT DIR PATH>] [%s <NUM>]\n", flagMode, config.ModeBreach, flagFile, flagAll, flagForce, flagOutput, flagWorkers)
+			fmt.Fprintf(os.Stderr, "  bva %s %s %s <VAULT PATH> [%s] [%s] [%s <REPORT DIR PATH>] [%s <NUM>]\n\n", flagMode, config.ModeBreach, flagFileShort, flagAllShort, flagForce, flagOutputShort, flagWorkersShort)
 			fmt.Fprintf(os.Stderr, "Options:\n")
 			fmt.Fprintf(os.Stderr, "  %s, %-14s  Path to the Enpass JSON vault file (default \"enpass.json\")\n", flagFileShort, flagFile)
 			fmt.Fprintf(os.Stderr, "  %s, %-14s  Path to save the audit reports directory\n", flagOutputShort, flagOutput)
@@ -91,18 +103,18 @@ func setupHelp(mode *string, fs *flag.FlagSet) {
 			fmt.Fprintf(os.Stderr, "      %-18s  Force update of local breach cache database, ignoring TTL\n", flagForce)
 			fmt.Fprintf(os.Stderr, "  %s, %-14s  Number of concurrent workers for HIBP checks (default: 5).\n", flagWorkersShort, flagWorkers)
 			fmt.Fprintf(os.Stderr, "                          Higher numbers check faster but use more resources.\n")
-		case modeMFA:
-			fmt.Fprintf(os.Stderr, "Mode: %s - Check security posture (2FA and Passkey support)\n\n", modeMFA)
+		case config.ModeMFA:
+			fmt.Fprintf(os.Stderr, "Mode: %s - Check security posture (2FA and Passkey support)\n\n", config.ModeMFA)
 			fmt.Fprintf(os.Stderr, "Usage:\n")
-			fmt.Fprintf(os.Stderr, "  bva %s %s %s <VAULT PATH> [%s] [%s <REPORT DIR PATH>]\n", flagMode, modeMFA, flagFile, flagForce, flagOutput)
-			fmt.Fprintf(os.Stderr, "  bva %s %s %s <VAULT PATH> [%s] [%s <REPORT DIR PATH>]\n\n", flagMode, modeMFA, flagFileShort, flagForce, flagOutputShort)
+			fmt.Fprintf(os.Stderr, "  bva %s %s %s <VAULT PATH> [%s] [%s <REPORT DIR PATH>]\n", flagMode, config.ModeMFA, flagFile, flagForce, flagOutput)
+			fmt.Fprintf(os.Stderr, "  bva %s %s %s <VAULT PATH> [%s] [%s <REPORT DIR PATH>]\n\n", flagMode, config.ModeMFA, flagFileShort, flagForce, flagOutputShort)
 			fmt.Fprintf(os.Stderr, "Options:\n")
 			fmt.Fprintf(os.Stderr, "  %s, %-14s  Path to the Enpass JSON vault file (default \"enpass.json\")\n", flagFileShort, flagFile)
 			fmt.Fprintf(os.Stderr, "  %s, %-14s  Path to save the audit reports directory\n", flagOutputShort, flagOutput)
 			fmt.Fprintf(os.Stderr, "      %-18s  Force update of local MFA cache databases, ignoring TTL\n", flagForce)
 		default:
 			fmt.Fprintf(os.Stderr, "Unknown mode: %s\n\n", *mode)
-			fmt.Fprintf(os.Stderr, "Available modes:\n  %s\n  %s\n", modeBreach, modeMFA)
+			fmt.Fprintf(os.Stderr, "Available modes:\n  %s\n  %s\n", config.ModeBreach, config.ModeMFA)
 			return
 		}
 

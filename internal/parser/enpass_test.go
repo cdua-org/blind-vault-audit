@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/cdua-org/blind-vault-audit/internal/config"
 )
 
 func TestEnpassProvider_Parse(t *testing.T) {
@@ -85,5 +87,60 @@ func TestEnpassProvider_Parse_InvalidJSON(t *testing.T) {
 	_, err := provider.Parse(ctx, filePath)
 	if err == nil {
 		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestEnpassProvider_extractUpdatedAt(t *testing.T) {
+	provider := NewEnpassProvider()
+
+	if v := provider.extractUpdatedAt(int(12345)); v != 12345 {
+		t.Errorf("expected 12345, got %d", v)
+	}
+	if v := provider.extractUpdatedAt(float64(54321)); v != 54321 {
+		t.Errorf("expected 54321, got %d", v)
+	}
+}
+
+func TestEnpassProvider_extractDomain(t *testing.T) {
+	provider := NewEnpassProvider()
+
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"http://invalid%url", "http"},
+		{"example.net:8080", "example.net"},
+		{"127.0.0.1", "127.0.0.1"},
+		{"http://192.168.1.1:9090", "192.168.1.1"},
+		{"www.example.org", "example.org"},
+	}
+
+	for _, tt := range tests {
+		if got := provider.extractDomain(tt.input); got != tt.expected {
+			t.Errorf("extractDomain(%q) = %q; want %q", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestEnpassProvider_parseItem(t *testing.T) {
+	provider := NewEnpassProvider()
+
+	types := []string{config.FieldTypePassword, config.FieldTypeUsername, config.FieldTypeURL}
+	fields := []fieldJSON{
+		{Type: types[0], Value: "pass1", ValueUpdatedAt: int(1600000000)},
+		{Type: types[1], Value: ""},
+		{Type: types[2], Value: "http://invalid%url"},
+	}
+
+	item := provider.parseItem("", fields)
+
+	if item.Title != "Untitled" {
+		t.Errorf("expected 'Untitled', got %q", item.Title)
+	}
+	if len(item.Passwords) != 1 || item.Passwords[0].Value != "pass1" {
+		t.Errorf("expected 1 password 'pass1', got %v", item.Passwords)
+	}
+	if item.Passwords[0].UpdatedAt != 1600000000 {
+		t.Errorf("expected timestamp 1600000000, got %d", item.Passwords[0].UpdatedAt)
 	}
 }

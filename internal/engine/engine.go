@@ -4,15 +4,18 @@ package engine
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/cdua-org/blind-vault-audit/internal/cache"
 	"github.com/cdua-org/blind-vault-audit/internal/cli/spinner"
+	"github.com/cdua-org/blind-vault-audit/internal/config"
 	"github.com/cdua-org/blind-vault-audit/internal/hibp"
 	"github.com/cdua-org/blind-vault-audit/internal/parser"
 )
 
 // Config holds the configuration for the audit engine.
 type Config struct {
+	HTTPClient   *http.Client
 	Mode         string
 	OutputDir    string
 	CacheOptions []cache.Option
@@ -29,11 +32,14 @@ type Engine struct {
 }
 
 // New creates a new Engine instance.
-func New(hibpClient *hibp.Client, provider parser.Provider, config Config) *Engine {
+func New(hibpClient *hibp.Client, provider parser.Provider, cfg *Config) *Engine {
+	if cfg.HTTPClient == nil {
+		cfg.HTTPClient = &http.Client{}
+	}
 	return &Engine{
 		hibpClient: hibpClient,
 		parser:     provider,
-		config:     config,
+		config:     *cfg,
 	}
 }
 
@@ -46,7 +52,7 @@ func (e *Engine) Run(ctx context.Context, vaultPath string) error {
 		return fmt.Errorf("failed to parse vault: %w", err)
 	}
 
-	if e.config.Mode == "mfa" {
+	if e.config.Mode == config.ModeMFA {
 		return e.runMFA(ctx, items)
 	}
 	return e.runBreach(ctx, items)

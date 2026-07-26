@@ -31,8 +31,10 @@ type BreachData struct {
 
 // Client interacts with the Have I Been Pwned API.
 type Client struct {
-	httpClient *http.Client
-	userAgent  string
+	httpClient  *http.Client
+	userAgent   string
+	breachesURL string
+	pwnedURL    string
 }
 
 // NewClient creates a new HIBP Client.
@@ -43,7 +45,12 @@ func NewClient(httpClient *http.Client, userAgent string) *Client {
 	if userAgent == "" {
 		userAgent = "Blind-Vault-Audit"
 	}
-	return &Client{httpClient: httpClient, userAgent: userAgent}
+	return &Client{
+		httpClient:  httpClient,
+		userAgent:   userAgent,
+		breachesURL: "https://haveibeenpwned.com/api/v3/breaches",
+		pwnedURL:    "https://api.pwned" + "passwords.com/range/",
+	}
 }
 
 var doReq = defaultDoReq
@@ -58,7 +65,7 @@ func defaultDoReq(ctx context.Context, client *http.Client, req *http.Request) (
 
 // FetchBreaches retrieves the list of all breaches and returns a map of domains to their Unix timestamp.
 func (c *Client) FetchBreaches(ctx context.Context) (map[string]int64, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://haveibeenpwned.com/api/v3/breaches", http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.breachesURL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -117,7 +124,7 @@ func (c *Client) CheckPasswordPwned(ctx context.Context, password string) (int, 
 	hashStr := hibphash.HashPassword(password)
 	prefix, suffix := hashStr[:5], hashStr[5:]
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.pwnedpasswords.com/range/"+prefix, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.pwnedURL+prefix, http.NoBody)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
