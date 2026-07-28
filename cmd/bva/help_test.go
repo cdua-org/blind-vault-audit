@@ -54,6 +54,11 @@ func TestSetupHelp(t *testing.T) {
 			wantText: "Mode: mfa - Check security posture (2FA and Passkey support)",
 		},
 		{
+			name:     "ModeUpdate",
+			modeVal:  config.ModeUpdate,
+			wantText: "Mode: update - Self-update bva utility to the latest release",
+		},
+		{
 			name:     "UnknownMode",
 			modeVal:  "invalid_mode",
 			wantText: "Unknown mode: invalid_mode",
@@ -69,13 +74,54 @@ func TestSetupHelp(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mode := tt.modeVal
 			fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-			setupHelp(&mode, fs)
+			setupHelp(&mode, nil, fs)
 			output := captureStderr(t, func() {
 				fs.Usage()
 			})
 
 			if !strings.Contains(output, tt.wantText) {
 				t.Errorf("expected output to contain %q, got %q", tt.wantText, output)
+			}
+		})
+	}
+}
+
+func TestPrintUsageExamples(t *testing.T) {
+	tests := []struct {
+		name     string
+		modeVal  string
+		wantText string
+	}{
+		{
+			name:     "ModeBreach",
+			modeVal:  config.ModeBreach,
+			wantText: usageBreach,
+		},
+		{
+			name:     "ModeMFA",
+			modeVal:  config.ModeMFA,
+			wantText: usageMFA,
+		},
+		{
+			name:     "ModeUpdate",
+			modeVal:  config.ModeUpdate,
+			wantText: usageUpdate,
+		},
+		{
+			name:     "UnknownMode",
+			modeVal:  "bad_mode_help",
+			wantText: usageMFA,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := captureStderr(t, func() {
+				printUsageExamples(tt.modeVal)
+			})
+
+			if !strings.Contains(output, tt.wantText) {
+				t.Errorf("expected output to contain %q", tt.wantText)
 			}
 		})
 	}
@@ -91,7 +137,7 @@ func TestSetupHelp_CacheDirError(t *testing.T) {
 
 	mode := config.ModeBreach
 	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-	setupHelp(&mode, fs)
+	setupHelp(&mode, nil, fs)
 	output := captureStderr(t, func() {
 		fs.Usage()
 	})

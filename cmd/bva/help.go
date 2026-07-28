@@ -13,6 +13,7 @@ const (
 	bannerPad   = "   "
 	usageMFA    = "  bva " + flagMode + " " + config.ModeMFA + " " + flagFile + " <VAULT PATH> [" + flagForce + "] [" + flagOutput + " <REPORT DIR PATH>]"
 	usageBreach = "  bva " + flagMode + " " + config.ModeBreach + " " + flagFile + " <VAULT PATH> [" + flagPasswordsOnly + "] [" + flagForce + "] [" + flagOutput + " <REPORT DIR PATH>] [" + flagWorkers + " <NUM>]"
+	usageUpdate = "  bva " + config.ModeUpdate
 )
 
 func defaultUserCacheDir() (string, error) {
@@ -74,6 +75,8 @@ func printUsageExamples(mode string) {
 		fmt.Fprintf(os.Stderr, "%s\n", usageMFA)
 	case config.ModeBreach:
 		fmt.Fprintf(os.Stderr, "%s\n", usageBreach)
+	case config.ModeUpdate:
+		fmt.Fprintf(os.Stderr, "%s\n", usageUpdate)
 	default:
 		fmt.Fprintf(os.Stderr, "%s\n", usageMFA)
 		fmt.Fprintf(os.Stderr, "%s\n", usageBreach)
@@ -81,7 +84,7 @@ func printUsageExamples(mode string) {
 	fmt.Fprintf(os.Stderr, "\n")
 }
 
-func setupHelp(mode *string, fs *flag.FlagSet) {
+func setupHelp(mode *string, args []string, fs *flag.FlagSet) {
 	fs.Usage = func() {
 		cacheDir, err := osUserCacheDir()
 		if err == nil && cacheDir != "" {
@@ -90,13 +93,20 @@ func setupHelp(mode *string, fs *flag.FlagSet) {
 			cacheDir = "unknown (could not determine user cache dir)"
 		}
 
-		if mode == nil || *mode == "" {
+		detectedMode := ""
+		if mode != nil {
+			detectedMode = getModeForUsage(mode, args)
+		}
+
+		if detectedMode == "" {
 			fmt.Fprintf(os.Stderr, "Usage:\n")
 			fmt.Fprintf(os.Stderr, "  bva %s <%s|%s> [options]\n", flagMode, config.ModeBreach, config.ModeMFA)
-			fmt.Fprintf(os.Stderr, "  bva %s\n\n", flagVersion)
+			fmt.Fprintf(os.Stderr, "  bva %s\n", flagVersion)
+			fmt.Fprintf(os.Stderr, "  bva update\n\n")
 			fmt.Fprintf(os.Stderr, "Modes:\n")
 			fmt.Fprintf(os.Stderr, "  %s   Check passwords against Have I Been Pwned database\n", config.ModeBreach)
-			fmt.Fprintf(os.Stderr, "  %s      Check security posture (2FA and Passkey support)\n\n", config.ModeMFA)
+			fmt.Fprintf(os.Stderr, "  %s      Check security posture (2FA and Passkey support)\n", config.ModeMFA)
+			fmt.Fprintf(os.Stderr, "  %s   Self-update bva utility to the latest release\n\n", config.ModeUpdate)
 			fmt.Fprintf(os.Stderr, "Tip: Run 'bva %s <mode> %s' for mode-specific options.\n\n", flagMode, flagHelp)
 			fmt.Fprintf(os.Stderr, "Global Options:\n")
 			fmt.Fprintf(os.Stderr, "  %s, %-18s  Print this help message and exit\n\n", flagHelpShort, flagHelp)
@@ -104,7 +114,7 @@ func setupHelp(mode *string, fs *flag.FlagSet) {
 			return
 		}
 
-		switch *mode {
+		switch detectedMode {
 		case config.ModeBreach:
 			fmt.Fprintf(os.Stderr, "Mode: %s - Check passwords against HIBP database\n\n", config.ModeBreach)
 			fmt.Fprintf(os.Stderr, "Usage:\n")
@@ -126,9 +136,16 @@ func setupHelp(mode *string, fs *flag.FlagSet) {
 			fmt.Fprintf(os.Stderr, "  %s, %-18s  Path to the JSON vault file\n", flagFileShort, flagFile)
 			fmt.Fprintf(os.Stderr, "  %s, %-18s  Path to save the audit reports directory\n", flagOutputShort, flagOutput)
 			fmt.Fprintf(os.Stderr, "      %-18s  Force update of local MFA cache databases, ignoring TTL\n", flagForce)
+		case config.ModeUpdate:
+			fmt.Fprintf(os.Stderr, "Mode: %s - Self-update bva utility to the latest release\n\n", config.ModeUpdate)
+			fmt.Fprintf(os.Stderr, "Usage:\n")
+			fmt.Fprintf(os.Stderr, "%s\n", usageUpdate)
+			fmt.Fprintf(os.Stderr, "  bva %s %s\n\n", config.ModeUpdate, flagHelp)
+			return
 		default:
-			fmt.Fprintf(os.Stderr, "Unknown mode: %s\n\n", *mode)
-			fmt.Fprintf(os.Stderr, "Available modes:\n  %s\n  %s\n", config.ModeBreach, config.ModeMFA)
+			fmt.Fprintf(os.Stderr, "Unknown mode: %s\n\n", detectedMode)
+			fmt.Fprintf(os.Stderr, "Usage:\n")
+			fmt.Fprintf(os.Stderr, "Available modes:\n  %s\n  %s\n  %s\n", config.ModeBreach, config.ModeMFA, config.ModeUpdate)
 			return
 		}
 

@@ -27,7 +27,7 @@ func TestMain_InvalidMode(t *testing.T) {
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
 
-	os.Args = []string{"bva-test-1", flagMode, "invalid_mode"}
+	os.Args = []string{"bva-test-1", flagMode, "bad_mode_main"}
 	main()
 
 	if !exited {
@@ -283,7 +283,7 @@ func TestRun_ParseError(t *testing.T) {
 		{"HelpFlagShort", "Global Options:", []string{flagHelpShort}},
 		{"HelpFlagLong", "Modes:", []string{flagHelp}},
 		{"HelpAfterFlagFile", "Cache Directory:", []string{flagFileShort, flagHelpShort}},
-		{"MissingModeWithFile", "--mode is required (breach or mfa)", []string{flagFile, "vault.json"}},
+		{"MissingModeWithFile", "Error: --mode is required (breach or mfa)", []string{flagFile, "vault.json"}},
 	}
 
 	for _, tt := range tests {
@@ -517,5 +517,101 @@ func TestRequiresBreachMode(t *testing.T) {
 				t.Errorf("expected %q, got %q", tt.wantText, got)
 			}
 		})
+	}
+}
+
+func TestRun_UpdateMode(t *testing.T) {
+	originalHTTPClient := newHTTPClient
+	defer func() { newHTTPClient = originalHTTPClient }()
+
+	newHTTPClient = func() *http.Client {
+		return &http.Client{
+			Transport: &mockRoundTripper{
+				roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+					return nil, errors.New("simulated network error")
+				},
+			},
+		}
+	}
+
+	output := captureStderr(t, func() {
+		err := run([]string{config.ModeUpdate})
+		if err != nil {
+			t.Errorf("expected no error from run(), got %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "Update failed:") {
+		t.Errorf("expected update failure message in stderr, got %q", output)
+	}
+}
+
+func TestRun_UpdateSubcommand(t *testing.T) {
+	tests := []struct {
+		name       string
+		wantStderr string
+		args       []string
+		wantErr    bool
+	}{
+		{
+			name:       "HelpFlag",
+			wantStderr: "bva update --help",
+			args:       []string{config.ModeUpdate, flagHelpShort},
+			wantErr:    true,
+		},
+		{
+			name:       "UnknownFlag",
+			wantStderr: "unknown flag '-f' for update command",
+			args:       []string{config.ModeUpdate, flagFileShort},
+			wantErr:    true,
+		},
+		{
+			name:       "ModeUpdateRejected",
+			wantStderr: "invalid mode 'update'",
+			args:       []string{flagMode, config.ModeUpdate},
+			wantErr:    true,
+		},
+		{
+			name:       "ModeUpdateSingleDash",
+			wantStderr: "invalid mode 'update'",
+			args:       []string{"-mode", config.ModeUpdate},
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := captureStderr(t, func() {
+				err := run(tt.args)
+				if tt.wantErr && !errors.Is(err, flag.ErrHelp) {
+					t.Errorf("expected flag.ErrHelp, got %v", err)
+				}
+			})
+			if !strings.Contains(output, tt.wantStderr) {
+				t.Errorf("expected %q in stderr, got %q", tt.wantStderr, output)
+			}
+		})
+	}
+}
+
+func TestParseMode_UpdatePositional(t *testing.T) {
+	mode := ""
+	err := parseMode(&mode, []string{config.ModeUpdate})
+	if err != nil {
+		t.Errorf("expected no error for positional update, got %v", err)
+	}
+	if mode != config.ModeUpdate {
+		t.Errorf("expected mode %q, got %q", config.ModeUpdate, mode)
+	}
+}
+
+func TestParseMode_ModeUpdateFlag(t *testing.T) {
+	mode := config.ModeUpdate
+	err := parseMode(&mode, nil)
+	if err == nil {
+		t.Errorf("expected error for mode update, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid mode 'update'") {
+		t.Errorf("expected error to contain invalid mode 'update', got %v", err)
 	}
 }

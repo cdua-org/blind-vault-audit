@@ -8,10 +8,14 @@ const (
 	EndpointBreaches = "https://haveibeenpwned.com/api/v3/breaches"
 )
 
+// EndpointUpdate is the endpoint for the latest release.
+var EndpointUpdate = "https://api.github.com/repos/cdua-org/blind-vault-audit/releases/latest"
+
 // Modes supported by the application.
 const (
 	ModeBreach = "breach"
 	ModeMFA    = "mfa"
+	ModeUpdate = "update"
 )
 
 // Field types.

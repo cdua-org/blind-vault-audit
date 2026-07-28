@@ -71,10 +71,12 @@ The default cache location for fetched datasets depends on the operating system:
 Usage:
   bva --mode <breach|mfa> [options]
   bva --version
+  bva update
 
 Modes:
   breach   Check passwords against Have I Been Pwned database
   mfa      Check security posture (2FA and Passkey support)
+  update   Self-update bva utility to the latest release
 
 Tip: Run 'bva --mode <mode> --help' for mode-specific options.
 
@@ -129,6 +131,23 @@ Options:
   -o, --output          Path to save the audit reports directory
       --force           Force update of local MFA cache databases, ignoring TTL
   -h, --help            Print this help message and exit
+```
+
+</details>
+
+<details>
+<summary><b>Self-Update</b></summary>
+
+The `update` command checks for the latest release on GitHub and automatically replaces the current binary:
+- Compares the installed version against the latest GitHub release tag.
+- Downloads the appropriate archive for the current OS and architecture.
+- Verifies the SHA-256 checksum of the downloaded archive against the published checksums file.
+- Performs an atomic binary replacement (on Windows, the old binary is renamed and cleaned up on the next run).
+
+```text
+Usage:
+  bva update
+  bva update --help
 ```
 
 </details>

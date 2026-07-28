@@ -16,6 +16,7 @@ import (
 	"github.com/cdua-org/blind-vault-audit/internal/engine"
 	"github.com/cdua-org/blind-vault-audit/internal/hibp"
 	"github.com/cdua-org/blind-vault-audit/internal/parser"
+	"github.com/cdua-org/blind-vault-audit/internal/updater"
 )
 
 var (
@@ -60,6 +61,8 @@ func main() {
 }
 
 func run(args []string) error {
+	updater.CleanupWindowsOldFiles()
+
 	fs := flag.NewFlagSet("bva", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
@@ -75,13 +78,23 @@ func run(args []string) error {
 	force := fs.Bool(flagForce[2:], false, "Force update of local cache (mfa mode only)")
 	versionFlag := fs.Bool(flagVersion[2:], false, "Print version and exit")
 
-	printBanner(Version)
+	maybePrintBanner(mode, args)
 
 	if len(args) == 1 && args[0] == flagVersion {
 		return nil
 	}
 
-	setupHelp(mode, fs)
+	if len(args) > 0 && args[0] == config.ModeUpdate {
+		return handleUpdateCommand(args[1:])
+	}
+
+	if containsModeUpdate(args) {
+		fmt.Fprintf(os.Stderr, "%sError: invalid mode '%s'%s\n\n", colorError, config.ModeUpdate, colorReset)
+		printUsageExamples(config.ModeUpdate)
+		return flag.ErrHelp
+	}
+
+	setupHelp(mode, args, fs)
 	customUsage := fs.Usage
 	fs.Usage = func() {}
 
@@ -99,21 +112,8 @@ func run(args []string) error {
 		return nil
 	}
 
-	if err := parseMode(mode, fs.Args()); err != nil {
-		detectedMode := getModeForUsage(mode, args)
-		if detectedMode == config.ModeBreach {
-			fmt.Fprintf(os.Stderr, "%sError: %s%s\n\n", colorError, requiresBreachMode(args), colorReset)
-		} else {
-			fmt.Fprintf(os.Stderr, "%sError: %v%s\n\n", colorError, err, colorReset)
-		}
-		printUsageExamples(detectedMode)
-		return flag.ErrHelp
-	}
-
-	if err := validateFlags(*mode, *checkPasswordsOnly); err != nil {
-		fmt.Fprintf(os.Stderr, "%sError: %v%s\n\n", colorError, err, colorReset)
-		printUsageExamples(*mode)
-		return flag.ErrHelp
+	if err := validateModeAndFlags(mode, args, fs.Args(), *checkPasswordsOnly); err != nil {
+		return err
 	}
 
 	finalVaultFile := *vaultFile
@@ -203,12 +203,78 @@ func checkHelpFlagPresent(args []string) bool {
 	return false
 }
 
+func containsModeUpdate(args []string) bool {
+	for i, arg := range args {
+		if (arg == flagMode || arg == "-mode") && i+1 < len(args) && args[i+1] == config.ModeUpdate {
+			return true
+		}
+	}
+	return false
+}
+
+func maybePrintBanner(_ *string, args []string) {
+	if len(args) == 1 && args[0] == config.ModeUpdate {
+		return
+	}
+	printBanner(Version)
+}
+
+func validateModeAndFlags(mode *string, rawArgs, remaining []string, checkPasswordsOnly bool) error {
+	if err := parseMode(mode, remaining); err != nil {
+		detectedMode := getModeForUsage(mode, rawArgs)
+		if detectedMode == config.ModeBreach {
+			fmt.Fprintf(os.Stderr, "%sError: %s%s\n\n", colorError, requiresBreachMode(rawArgs), colorReset)
+		} else {
+			fmt.Fprintf(os.Stderr, "%sError: %v%s\n\n", colorError, err, colorReset)
+		}
+		printUsageExamples(detectedMode)
+		return flag.ErrHelp
+	}
+
+	if err := validateFlags(*mode, checkPasswordsOnly); err != nil {
+		fmt.Fprintf(os.Stderr, "%sError: %v%s\n\n", colorError, err, colorReset)
+		printUsageExamples(*mode)
+		return flag.ErrHelp
+	}
+
+	return nil
+}
+
+func handleUpdateCommand(args []string) error {
+	if checkHelpFlagPresent(args) {
+		fs := flag.NewFlagSet("update", flag.ContinueOnError)
+		fs.SetOutput(io.Discard)
+		updateMode := config.ModeUpdate
+		setupHelp(&updateMode, args, fs)
+		fs.Usage()
+		return flag.ErrHelp
+	}
+
+	if len(args) > 0 {
+		fmt.Fprintf(os.Stderr, "%sError: unknown flag '%s' for update command%s\n\n", colorError, args[0], colorReset)
+		printUsageExamples(config.ModeUpdate)
+		return flag.ErrHelp
+	}
+
+	return runUpdate()
+}
+
+func runUpdate() error {
+	ctx := context.Background()
+	httpClient := newHTTPClient()
+	err := updater.Update(ctx, httpClient, Version)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%sUpdate failed: %v%s\n", colorError, err, colorReset)
+	}
+	return nil
+}
+
 func getModeForUsage(mode *string, args []string) string {
 	if mode != nil && *mode != "" {
 		return *mode
 	}
 	for _, arg := range args {
-		if arg == config.ModeBreach || arg == config.ModeMFA {
+		if arg == config.ModeBreach || arg == config.ModeMFA || arg == config.ModeUpdate {
 			return arg
 		}
 		if arg == flagPasswordsOnly || arg == flagWorkers || arg == flagWorkersShort {
@@ -228,8 +294,11 @@ func requiresBreachMode(args []string) string {
 }
 
 func parseMode(mode *string, args []string) error {
+	if *mode == config.ModeUpdate {
+		return fmt.Errorf("invalid mode '%s'", *mode)
+	}
 	if *mode == "" && len(args) > 0 {
-		if args[0] == config.ModeBreach || args[0] == config.ModeMFA {
+		if args[0] == config.ModeBreach || args[0] == config.ModeMFA || args[0] == config.ModeUpdate {
 			*mode = args[0]
 		}
 	}
@@ -240,10 +309,10 @@ func parseMode(mode *string, args []string) error {
 }
 
 func validateFlags(mode string, passwordsOnly bool) error {
-	if mode == config.ModeMFA && passwordsOnly {
+	if mode != config.ModeBreach && passwordsOnly {
 		return fmt.Errorf("%s flag is only valid for mode: %s", flagPasswordsOnly, config.ModeBreach)
 	}
-	if mode != config.ModeBreach && mode != config.ModeMFA {
+	if mode != config.ModeBreach && mode != config.ModeMFA && mode != config.ModeUpdate {
 		return fmt.Errorf("invalid mode '%s'", mode)
 	}
 	return nil
