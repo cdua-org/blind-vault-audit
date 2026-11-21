@@ -1,4 +1,4 @@
-.PHONY: check test coverage vulncheck trivy secrets-scan verify clean
+.PHONY: check test coverage vulncheck trivy secrets-scan verify build clean
 
 check:
 	@test -z "$$(gofmt -s -l .)" || (echo "Unformatted files found. Run 'gofmt -s -w .' to fix them." && false)
@@ -22,6 +22,9 @@ secrets-scan:
 	gitleaks detect --source . --no-git --no-color -v --redact
 
 verify: check test vulncheck trivy secrets-scan
+
+build:
+	CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.AppVersion=$(VERSION)" -o bva ./cmd/bva
 
 clean:
 	rm -rf coverage *.out .gocache

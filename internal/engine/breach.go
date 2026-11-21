@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -379,7 +380,7 @@ func (e *Engine) formatResult(results []pwCheckResult, isSafe bool) string {
 
 func (e *Engine) checkBreachedDomains(item parser.VaultItem, breaches map[string]BreachInfo) (isCompromised bool, breachTs int64, breachedDomains, leakedData []string) {
 	for _, domain := range item.Domains {
-		bInfo, ok := breaches[domain]
+		matchedKey, bInfo, ok := lookupDomain(breaches, domain)
 		if !ok {
 			continue
 		}
@@ -399,12 +400,16 @@ func (e *Engine) checkBreachedDomains(item parser.VaultItem, breaches map[string
 			continue
 		}
 
+		if slices.Contains(breachedDomains, matchedKey) {
+			continue
+		}
+
 		isCompromised = true
 		if bInfo.BreachDate > breachTs {
 			breachTs = bInfo.BreachDate
 		}
-		breachedDomains = append(breachedDomains, domain)
+		breachedDomains = append(breachedDomains, matchedKey)
 		leakedData = append(leakedData, strings.Join(bInfo.DataClasses, ", "))
 	}
-	return
+	return isCompromised, breachTs, breachedDomains, leakedData
 }

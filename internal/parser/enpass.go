@@ -7,11 +7,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/cdua-org/blind-vault-audit/internal/config"
-	"golang.org/x/net/publicsuffix"
 )
 
 // EnpassProvider implements the Provider interface for Enpass JSON exports.
@@ -128,6 +128,7 @@ func (p *EnpassProvider) parseItem(title string, fields []fieldJSON) VaultItem {
 	for d := range domainSet {
 		vaultItem.Domains = append(vaultItem.Domains, d)
 	}
+	slices.Sort(vaultItem.Domains)
 
 	sort.SliceStable(vaultItem.Passwords, func(i, j int) bool {
 		return vaultItem.Passwords[i].Order < vaultItem.Passwords[j].Order
@@ -153,13 +154,7 @@ func (p *EnpassProvider) extractDomain(val string) string {
 	if colonIdx := strings.Index(host, ":"); colonIdx != -1 {
 		host = host[:colonIdx]
 	}
-	host = strings.TrimPrefix(host, "www.")
-
-	root, err := publicsuffix.EffectiveTLDPlusOne(host)
-	if err == nil && root != "" {
-		return root
-	}
-	return host
+	return strings.TrimPrefix(host, "www.")
 }
 
 func (p *EnpassProvider) extractUpdatedAt(val any) int64 {

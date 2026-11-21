@@ -187,42 +187,59 @@ func (e *Engine) parsePasskeysData(data []byte) (map[string]SecurityInfo, error)
 }
 
 func (e *Engine) evaluateMFAItem(item parser.VaultItem, domains2FA, passkeysDomains map[string]SecurityInfo) (local2FA, localPasskey []string) {
-	var matched2FA, matchedPasskey []string
-	var docs2FA, notes2FA, docsPasskey, notesPasskey []string
-
-	for _, domain := range item.Domains {
-		d := strings.ToLower(domain)
-
-		if info, has2FA := domains2FA[d]; has2FA && !item.HasTOTP {
-			matched2FA = append(matched2FA, d)
-			if info.Documentation != "" && !slices.Contains(docs2FA, info.Documentation) {
-				docs2FA = append(docs2FA, info.Documentation)
-			}
-			if info.Notes != "" && !slices.Contains(notes2FA, info.Notes) {
-				notes2FA = append(notes2FA, info.Notes)
-			}
-		}
-
-		if infoP, hasPasskey := passkeysDomains[d]; hasPasskey {
-			matchedPasskey = append(matchedPasskey, d)
-			if infoP.Documentation != "" && !slices.Contains(docsPasskey, infoP.Documentation) {
-				docsPasskey = append(docsPasskey, infoP.Documentation)
-			}
-			if infoP.Notes != "" && !slices.Contains(notesPasskey, infoP.Notes) {
-				notesPasskey = append(notesPasskey, infoP.Notes)
-			}
-		}
-	}
+	matched2FA, docs2FA, notes2FA := e.collect2FAFindings(item, domains2FA)
+	matchedPK, docsPK, notesPK := e.collectPasskeyFindings(item, passkeysDomains)
 
 	if len(matched2FA) > 0 {
 		local2FA = append(local2FA, buildMFAMessage(item.Title, matched2FA, docs2FA, notes2FA))
 	}
 
-	if len(matchedPasskey) > 0 {
-		localPasskey = append(localPasskey, buildMFAMessage(item.Title, matchedPasskey, docsPasskey, notesPasskey))
+	if len(matchedPK) > 0 {
+		localPasskey = append(localPasskey, buildMFAMessage(item.Title, matchedPK, docsPK, notesPK))
 	}
 
 	return local2FA, localPasskey
+}
+
+func (e *Engine) collect2FAFindings(item parser.VaultItem, domains2FA map[string]SecurityInfo) (matched, docs, notes []string) {
+	if item.HasTOTP {
+		return nil, nil, nil
+	}
+	for _, domain := range item.Domains {
+		key2FA, info, has2FA := lookupDomain(domains2FA, domain)
+		if !has2FA {
+			continue
+		}
+		if !slices.Contains(matched, key2FA) {
+			matched = append(matched, key2FA)
+		}
+		if info.Documentation != "" && !slices.Contains(docs, info.Documentation) {
+			docs = append(docs, info.Documentation)
+		}
+		if info.Notes != "" && !slices.Contains(notes, info.Notes) {
+			notes = append(notes, info.Notes)
+		}
+	}
+	return matched, docs, notes
+}
+
+func (e *Engine) collectPasskeyFindings(item parser.VaultItem, passkeysDomains map[string]SecurityInfo) (matched, docs, notes []string) {
+	for _, domain := range item.Domains {
+		keyPK, infoP, hasPasskey := lookupDomain(passkeysDomains, domain)
+		if !hasPasskey {
+			continue
+		}
+		if !slices.Contains(matched, keyPK) {
+			matched = append(matched, keyPK)
+		}
+		if infoP.Documentation != "" && !slices.Contains(docs, infoP.Documentation) {
+			docs = append(docs, infoP.Documentation)
+		}
+		if infoP.Notes != "" && !slices.Contains(notes, infoP.Notes) {
+			notes = append(notes, infoP.Notes)
+		}
+	}
+	return matched, docs, notes
 }
 
 func buildMFAMessage(title string, matched, docs, notes []string) string {

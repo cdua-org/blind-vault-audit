@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -110,7 +111,7 @@ func TestRunBreach(t *testing.T) {
 			items: []parser.VaultItem{
 				{
 					Title:     "No Password Item",
-					Domains:   []string{"example.org"},
+					Domains:   []string{"nopass.example.org"},
 					Passwords: nil,
 				},
 			},
@@ -180,7 +181,7 @@ func TestRunBreach(t *testing.T) {
 			},
 			roundTrip: func(_ *http.Request) (*http.Response, error) { return nil, errors.New("not used") },
 			items: []parser.VaultItem{
-				{Title: "Cached Item", Domains: []string{"example.com"}},
+				{Title: "Cached Item", Domains: []string{"cached.example.com"}},
 			},
 			wantErr: false,
 			force:   false,
@@ -253,7 +254,7 @@ func TestCheckBreachedDomains(t *testing.T) {
 		{
 			name: "Compromised domain",
 			breaches: map[string]BreachInfo{
-				"breach1.example.com": {
+				"single.example.com": {
 					Title:       "Example Breach",
 					BreachDate:  1704067200,
 					DataClasses: []string{DataClassPasswords},
@@ -269,8 +270,23 @@ func TestCheckBreachedDomains(t *testing.T) {
 					DataClasses: []string{},
 				},
 			},
-			itemDomains:         []string{"breach1.example.com", "safe.example.org", "unknown.example.net", "empty.example.com"},
-			wantBreachedDomains: []string{"b1.com"},
+			itemDomains:         []string{"sub.single.example.com", "safe.example.org", "unknown.example.net", "empty.example.com"},
+			wantBreachedDomains: []string{"single.example.com"},
+			wantLeakedData:      []string{DataClassPasswords},
+			wantBreachTs:        1704067200,
+			wantIsCompromised:   true,
+		},
+		{
+			name: "Subdomain resolution and deduplication",
+			breaches: map[string]BreachInfo{
+				"pwned.example.net": {
+					Title:       "Pwned Network",
+					BreachDate:  1704067200,
+					DataClasses: []string{DataClassPasswords},
+				},
+			},
+			itemDomains:         []string{"sub1.pwned.example.net", "sub2.pwned.example.net"},
+			wantBreachedDomains: []string{"pwned.example.net"},
 			wantLeakedData:      []string{DataClassPasswords},
 			wantBreachTs:        1704067200,
 			wantIsCompromised:   true,
@@ -291,10 +307,10 @@ func TestCheckBreachedDomains(t *testing.T) {
 			if breachTs != tt.wantBreachTs {
 				t.Errorf("expected timestamp %d, got %d", tt.wantBreachTs, breachTs)
 			}
-			if len(breachedDomains) != len(tt.wantBreachedDomains) || (len(breachedDomains) > 0 && breachedDomains[0] != tt.itemDomains[0]) {
+			if !slices.Equal(breachedDomains, tt.wantBreachedDomains) {
 				t.Errorf("expected breached domains %v, got %v", tt.wantBreachedDomains, breachedDomains)
 			}
-			if len(leakedData) != len(tt.wantLeakedData) || (len(leakedData) > 0 && leakedData[0] != tt.wantLeakedData[0]) {
+			if !slices.Equal(leakedData, tt.wantLeakedData) {
 				t.Errorf("expected leaked data %v, got %v", tt.wantLeakedData, leakedData)
 			}
 		})

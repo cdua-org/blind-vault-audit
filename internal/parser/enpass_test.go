@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/cdua-org/blind-vault-audit/internal/config"
@@ -32,8 +33,8 @@ func checkUptimeItem(t *testing.T, item VaultItem) {
 	if item.Title != "Uptime" {
 		t.Errorf("expected 'Uptime', got '%s'", item.Title)
 	}
-	expectedDomains := []string{"example.com"}
-	if len(item.Domains) != len(expectedDomains) || item.Domains[0] != expectedDomains[0] {
+	expectedDomains := []string{"dashboard.uptime.example.com", "old.uptime.example.com"}
+	if !slices.Equal(item.Domains, expectedDomains) {
 		t.Errorf("expected domains %v, got %v", expectedDomains, item.Domains)
 	}
 	if len(item.Passwords) != 1 || item.Passwords[0].Value != "new_p" {
@@ -51,8 +52,8 @@ func checkClubItem(t *testing.T, item VaultItem) {
 	if item.Title != "club" {
 		t.Errorf("expected 'club', got '%s'", item.Title)
 	}
-	expectedDomains := []string{"example.net"}
-	if len(item.Domains) != len(expectedDomains) || item.Domains[0] != expectedDomains[0] {
+	expectedDomains := []string{"club.example.net", "new-club.example.net", "old-site.example.net"}
+	if !slices.Equal(item.Domains, expectedDomains) {
 		t.Errorf("expected domains %v, got %v", expectedDomains, item.Domains)
 	}
 	if item.HasTOTP {
@@ -113,6 +114,7 @@ func TestEnpassProvider_extractDomain(t *testing.T) {
 		{"127.0.0.1", "127.0.0.1"},
 		{"http://192.168.1.1:9090", "192.168.1.1"},
 		{"www.example.org", "example.org"},
+		{"https://sub.example.com/path", "sub.example.com"},
 	}
 
 	for _, tt := range tests {

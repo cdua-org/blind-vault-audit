@@ -31,7 +31,7 @@ func TestRunMFA(t *testing.T) {
 			items: []parser.VaultItem{
 				{
 					Title:   "Example",
-					Domains: []string{"example.com"},
+					Domains: []string{"sub.example.com"},
 				},
 			},
 			cacheFunc: func() (string, error) { return t.TempDir(), nil },
@@ -328,6 +328,29 @@ func TestEvaluateAllItems(t *testing.T) {
 				"mfa8.example.com": {
 					Documentation: "https://example.com/pk-7",
 					Notes:         "note2",
+				},
+			},
+		},
+		{
+			name:         "Subdomain resolution 2FA and PK",
+			want2FAItem:  "Subdomain 2FA",
+			wantPkItem:   "Subdomain PK",
+			want2FACount: 1,
+			wantPkCount:  1,
+			items: []parser.VaultItem{
+				{
+					Title:   "Subdomain 2FA and Subdomain PK",
+					Domains: []string{"auth.sub.portal.example.org"},
+				},
+			},
+			db2FA: map[string]SecurityInfo{
+				"portal.example.org": {
+					Documentation: "https://portal.example.org/2fa",
+				},
+			},
+			dbPK: map[string]SecurityInfo{
+				"portal.example.org": {
+					Documentation: "https://portal.example.org/pk",
 				},
 			},
 		},
